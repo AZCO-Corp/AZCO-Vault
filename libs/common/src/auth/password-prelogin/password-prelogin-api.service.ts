@@ -1,5 +1,3 @@
-import { firstValueFrom } from "rxjs";
-
 import { ApiService } from "../../abstractions/api.service";
 import { EnvironmentService } from "../../platform/abstractions/environment.service";
 
@@ -12,16 +10,11 @@ export class PasswordPreloginApiService {
     private environmentService: EnvironmentService,
   ) {}
 
+  // AZCO vaultwarden-compat: upstream moved this to POST /identity/accounts/prelogin/password
+  // in 2026.4; Vaultwarden still serves only the classic POST /api/accounts/prelogin with an
+  // identical request/response shape. Route to the classic endpoint.
   async getPreloginData(request: PasswordPreloginRequest): Promise<PasswordPreloginResponse> {
-    const env = await firstValueFrom(this.environmentService.environment$);
-    const r = await this.apiService.send(
-      "POST",
-      "/accounts/prelogin/password",
-      request,
-      false,
-      true,
-      env.getIdentityUrl(),
-    );
+    const r = await this.apiService.send("POST", "/accounts/prelogin", request, false, true);
     return new PasswordPreloginResponse(r);
   }
 }
