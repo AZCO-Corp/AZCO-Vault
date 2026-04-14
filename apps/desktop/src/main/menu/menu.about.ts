@@ -71,8 +71,8 @@ export class AboutMenu implements IMenubarMenu {
           "\nArchitecture " +
           process.arch;
         const result = await dialog.showMessageBox(this._window, {
-          title: "Bitwarden",
-          message: "Bitwarden",
+          title: "AZCO-Bitwarden",
+          message: "AZCO-Bitwarden",
           detail: aboutInformation,
           type: "info",
           noLink: true,
