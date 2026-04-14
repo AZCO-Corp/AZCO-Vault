@@ -298,7 +298,7 @@ export class WindowMain {
         backgroundThrottling: false,
         contextIsolation: true,
         session: this.session,
-        devTools: isDev(),
+        devTools: true,
       },
     });
 
@@ -360,10 +360,8 @@ export class WindowMain {
       );
     }
 
-    // Open the DevTools.
-    if (isDev()) {
-      this.win.webContents.openDevTools();
-    }
+    // Open the DevTools. (AZCO: always-on for dev fork)
+    this.win.webContents.openDevTools({ mode: "detach" });
 
     // Emitted when the window is closed.
     this.win.on("closed", async () => {
