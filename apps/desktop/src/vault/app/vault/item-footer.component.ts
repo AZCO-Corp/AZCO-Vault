@@ -15,8 +15,15 @@ import { firstValueFrom, switchMap } from "rxjs";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
+import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
+import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
+import { SendTextView } from "@bitwarden/common/tools/send/models/view/send-text.view";
+import { SendView } from "@bitwarden/common/tools/send/models/view/send.view";
+import { SendApiService } from "@bitwarden/common/tools/send/services/send-api.service.abstraction";
+import { SendService } from "@bitwarden/common/tools/send/services/send.service.abstraction";
+import { SendType } from "@bitwarden/common/tools/send/types/send-type";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
@@ -88,6 +95,10 @@ export class ItemFooterComponent implements OnInit, OnChanges {
     protected logService: LogService,
     protected cipherArchiveService: CipherArchiveService,
     protected archiveCipherUtilitiesService: ArchiveCipherUtilitiesService,
+    protected sendService: SendService,
+    protected sendApiService: SendApiService,
+    protected environmentService: EnvironmentService,
+    protected platformUtilsService: PlatformUtilsService,
   ) {}
 
   async ngOnInit() {
@@ -125,6 +136,62 @@ export class ItemFooterComponent implements OnInit, OnChanges {
 
   protected edit() {
     this.onEdit.emit(this.cipher);
+  }
+
+  // AZCO: share current cipher as a time-limited Bitwarden Send link.
+  // v1 uses hard-coded 7-day / 1-view defaults. Configurable dialog to follow in v2.
+  async shareLink(): Promise<void> {
+    if (!(await this.promptPassword())) {
+      return;
+    }
+    const DAYS = 7;
+    const MAX_VIEWS = 1;
+
+    try {
+      const c = this.cipher;
+      const body = [
+        `Name: ${c.name ?? "-"}`,
+        `URL:  ${c.login?.uris?.[0]?.uri ?? "-"}`,
+        `User: ${c.login?.username ?? "-"}`,
+        `Pass: ${c.login?.password ?? "-"}`,
+        c.notes ? `\nNotes:\n${c.notes}` : "",
+      ].join("\n");
+
+      const expiresAt = new Date(Date.now() + DAYS * 24 * 60 * 60 * 1000);
+      const send = new SendView();
+      send.name = `AZCO Share: ${c.name ?? "Item"}`;
+      send.type = SendType.Text;
+      send.text = new SendTextView();
+      send.text.text = body;
+      send.text.hidden = false;
+      send.deletionDate = expiresAt;
+      send.expirationDate = expiresAt;
+      send.maxAccessCount = MAX_VIEWS;
+      send.password = null as any;
+
+      const sendData = await this.sendService.encrypt(send, null as any, null as any, null);
+      const saved = await this.sendApiService.save(sendData);
+
+      const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+      const decrypted = await saved.decrypt(userId);
+
+      const env = await firstValueFrom(this.environmentService.environment$);
+      const link = env.getSendUrl() + decrypted.accessId + "/" + decrypted.urlB64Key;
+      this.platformUtilsService.copyToClipboard(link);
+
+      this.toastService.showToast({
+        variant: "success",
+        title: null,
+        message: `Share link copied — expires in ${DAYS} days, max ${MAX_VIEWS} view.`,
+      });
+    } catch (e) {
+      this.logService.error(e);
+      this.toastService.showToast({
+        variant: "error",
+        title: null,
+        message: `Share failed: ${(e as Error)?.message ?? "unknown"}`,
+      });
+    }
   }
 
   protected get hasFooterAction() {

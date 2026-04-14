@@ -16,6 +16,18 @@
         <i class="bwi bwi-pencil bwi-fw bwi-lg" aria-hidden="true" style="pointer-events: none">
         </i>
       </button>
+      <button
+        type="button"
+        class="primary"
+        (click)="shareLink()"
+        appA11yTitle="Share as timed link"
+      >
+        <i
+          class="bwi bwi-external-link bwi-fw bwi-lg"
+          aria-hidden="true"
+          style="pointer-events: none"
+        ></i>
+      </button>
     }
 
     @if (action === "edit" || action === "clone" || action === "add") {
