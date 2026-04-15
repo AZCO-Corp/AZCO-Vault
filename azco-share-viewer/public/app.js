@@ -103,8 +103,160 @@ function parseShareBody(text) {
   return { fields, notes };
 }
 
+// ─── TOTP (RFC 6238) ───────────────────────────────────────────────
+// The desktop app puts the TOTP secret (or the otpauth:// URL) into the
+// share body. The recipient never needs to see the raw secret — we parse
+// it client-side and render only the current rolling 6-digit code, which
+// refreshes every 30 seconds. Copy always grabs the *current* code.
+
+function base32Decode(input) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  const clean = input.replace(/=+$/, "").replace(/\s+/g, "").toUpperCase();
+  const out = [];
+  let buffer = 0;
+  let bits = 0;
+  for (const ch of clean) {
+    const idx = alphabet.indexOf(ch);
+    if (idx === -1) throw new Error("invalid base32 char");
+    buffer = (buffer << 5) | idx;
+    bits += 5;
+    if (bits >= 8) {
+      bits -= 8;
+      out.push((buffer >> bits) & 0xff);
+    }
+  }
+  return new Uint8Array(out);
+}
+
+function parseTotpSpec(value) {
+  if (!value || typeof value !== "string") return null;
+  let secret = value;
+  let period = 30;
+  let digits = 6;
+  if (/^otpauth:\/\//i.test(value)) {
+    try {
+      const u = new URL(value);
+      const p = u.searchParams;
+      if (p.get("secret")) secret = p.get("secret");
+      if (p.get("period")) period = parseInt(p.get("period"), 10) || 30;
+      if (p.get("digits")) digits = parseInt(p.get("digits"), 10) || 6;
+    } catch {
+      return null;
+    }
+  }
+  try {
+    const bytes = base32Decode(secret);
+    if (bytes.length === 0) return null;
+    return { bytes, period, digits };
+  } catch {
+    return null;
+  }
+}
+
+async function computeTotp(secretBytes, nowMs, period, digits) {
+  const counter = Math.floor(nowMs / 1000 / period);
+  const counterBytes = new Uint8Array(8);
+  new DataView(counterBytes.buffer).setBigUint64(0, BigInt(counter), false);
+  const key = await subtle.importKey("raw", secretBytes, { name: "HMAC", hash: "SHA-1" }, false, [
+    "sign",
+  ]);
+  const sig = new Uint8Array(await subtle.sign("HMAC", key, counterBytes));
+  const offset = sig[sig.length - 1] & 0x0f;
+  const binary =
+    ((sig[offset] & 0x7f) << 24) |
+    ((sig[offset + 1] & 0xff) << 16) |
+    ((sig[offset + 2] & 0xff) << 8) |
+    (sig[offset + 3] & 0xff);
+  const otp = binary % 10 ** digits;
+  return otp.toString().padStart(digits, "0");
+}
+
+function makeTotpRow(label, value) {
+  const spec = parseTotpSpec(value);
+  if (!spec) {
+    // Couldn't parse — fall back to a normal masked row.
+    return makeRow(label, value);
+  }
+
+  const row = document.createElement("div");
+  row.className = "field totp-field";
+
+  const lbl = document.createElement("span");
+  lbl.className = "label";
+  lbl.textContent = label;
+
+  const val = document.createElement("span");
+  val.className = "value totp-value";
+  const code = document.createElement("span");
+  code.className = "totp-code";
+  code.textContent = "••• •••";
+  const progress = document.createElement("span");
+  progress.className = "totp-progress";
+  const bar = document.createElement("span");
+  progress.appendChild(bar);
+  val.appendChild(code);
+  val.appendChild(progress);
+
+  const actions = document.createElement("span");
+  actions.className = "actions";
+  const copy = document.createElement("button");
+  copy.type = "button";
+  copy.textContent = "Copy";
+  copy.setAttribute("aria-label", "Copy TOTP code");
+  let currentCode = "";
+  copy.addEventListener("click", async () => {
+    if (!currentCode) return;
+    try {
+      await copyToClipboard(currentCode);
+      copy.textContent = "Copied";
+      copy.classList.add("copied");
+      setTimeout(() => {
+        copy.textContent = "Copy";
+        copy.classList.remove("copied");
+      }, 1400);
+    } catch {
+      /* clipboard denied — ignore */
+    }
+  });
+  actions.appendChild(copy);
+
+  row.appendChild(lbl);
+  row.appendChild(val);
+  row.appendChild(actions);
+
+  const tick = async () => {
+    try {
+      const now = Date.now();
+      currentCode = await computeTotp(spec.bytes, now, spec.period, spec.digits);
+      code.textContent =
+        spec.digits === 6 ? currentCode.replace(/(\d{3})(\d{3})/, "$1 $2") : currentCode;
+      const sec = (now / 1000) % spec.period;
+      const remaining = spec.period - sec;
+      bar.style.width = ((remaining / spec.period) * 100).toFixed(1) + "%";
+      progress.classList.toggle("low", remaining < 5);
+    } catch {
+      code.textContent = "error";
+    }
+  };
+  void tick();
+  setInterval(tick, 500);
+
+  return row;
+}
+
 // ─── UI rendering ──────────────────────────────────────────────────
 const SENSITIVE_LABELS = new Set(["Password", "CVV", "SSN", "Private Key", "Number"]);
+const URL_LABELS = new Set(["URL"]);
+
+function truncateMiddle(str, max) {
+  if (str.length <= max) return str;
+  const keep = Math.floor((max - 1) / 2);
+  return str.slice(0, keep) + "…" + str.slice(-keep);
+}
+
+function isHttpUrl(value) {
+  return /^https?:\/\//i.test(value);
+}
 
 function copyToClipboard(text) {
   return navigator.clipboard.writeText(text);
@@ -120,12 +272,26 @@ function makeRow(label, value) {
 
   const val = document.createElement("span");
   val.className = "value";
-  const inner = document.createElement("span");
-  inner.textContent = value;
-  val.appendChild(inner);
 
   const sensitive = SENSITIVE_LABELS.has(label);
-  if (sensitive) val.classList.add("masked");
+  const isUrl = URL_LABELS.has(label) && isHttpUrl(value);
+
+  if (isUrl) {
+    row.classList.add("url-field");
+    const link = document.createElement("a");
+    link.href = value;
+    link.target = "_blank";
+    link.rel = "noopener noreferrer";
+    link.className = "url-link";
+    link.title = value;
+    link.textContent = truncateMiddle(value, 70);
+    val.appendChild(link);
+  } else {
+    const inner = document.createElement("span");
+    inner.textContent = value;
+    val.appendChild(inner);
+    if (sensitive) val.classList.add("masked");
+  }
 
   const actions = document.createElement("span");
   actions.className = "actions";
@@ -151,11 +317,10 @@ function makeRow(label, value) {
   copy.addEventListener("click", async () => {
     try {
       await copyToClipboard(value);
-      const original = copy.textContent;
       copy.textContent = "Copied";
       copy.classList.add("copied");
       setTimeout(() => {
-        copy.textContent = original;
+        copy.textContent = "Copy";
         copy.classList.remove("copied");
       }, 1400);
     } catch {
@@ -175,7 +340,11 @@ function renderContent({ fields, notes, expirationDate }) {
   container.replaceChildren();
   for (const f of fields) {
     if (f.value === undefined || f.value === null || f.value === "") continue;
-    container.appendChild(makeRow(f.label, f.value));
+    if (f.label === "TOTP") {
+      container.appendChild(makeTotpRow(f.label, f.value));
+    } else {
+      container.appendChild(makeRow(f.label, f.value));
+    }
   }
   if (notes) {
     const row = document.createElement("div");

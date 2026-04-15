@@ -115,8 +115,8 @@ main {
 .field {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 12px 0;
+  gap: 12px;
+  padding: 14px 0;
   border-bottom: 1px solid var(--border);
 }
 .field:last-child {
@@ -124,21 +124,41 @@ main {
 }
 .field .label {
   flex: 0 0 auto;
-  width: 96px;
+  width: 84px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 .field .value {
   flex: 1 1 auto;
   min-width: 0;
   font-family: var(--mono);
-  font-size: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--text);
   word-break: break-word;
   overflow-wrap: anywhere;
   white-space: pre-wrap;
+}
+.field.url-field .value {
+  font-family: inherit;
+  font-size: 13.5px;
+  overflow: hidden;
+}
+.field.url-field .value .url-link {
+  display: inline-block;
+  max-width: 100%;
+  color: var(--azco-blue);
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.field.url-field .value .url-link:hover {
+  text-decoration: underline;
 }
 .field .value.masked::before {
   content: "••••••••";
@@ -183,6 +203,37 @@ main {
   background: var(--azco-blue);
   border-color: var(--azco-blue);
   color: #ffffff;
+}
+
+.totp-field .totp-value {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.totp-field .totp-code {
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--azco-blue);
+}
+.totp-field .totp-progress {
+  display: block;
+  width: 100%;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.totp-field .totp-progress > span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  background: var(--azco-blue);
+  transition: width 0.3s linear;
+}
+.totp-field .totp-progress.low > span {
+  background: var(--azco-red);
 }
 
 .notes-row {
