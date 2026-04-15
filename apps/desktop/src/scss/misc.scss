@@ -381,8 +381,12 @@ app-root > #loading,
 
 .logo-image {
   @include themify($themes) {
-    content: url("../images/logo-" + themed("logoSuffix") + "@2x.png");
+    content: url("../images/logo-" + themed("logoSuffix") + ".svg");
   }
+  // AZCO logo is ~3.78:1 aspect, taller than Bitwarden's original wordmark.
+  // Size the image so it sits neatly in the sidebar / login header.
+  height: 36px;
+  width: auto;
 }
 
 [hidden] {

@@ -3,14 +3,20 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="referrer" content="no-referrer" />
     <title>Shared with you &middot; AZCO</title>
-    <link rel="stylesheet" href="/styles.css" />
+    <link rel="icon" type="image/svg+xml" href="/logo-blue.svg?v=1" />
+    <link rel="stylesheet" href="/styles.css?v=1" />
   </head>
   <body>
     <main id="app">
+      <a class="brand" href="https://azcocorp.com" aria-label="AZCO">
+        <img src="/logo-blue.svg?v=1" alt="AZCO" width="160" height="42" />
+      </a>
+
       <section id="loading" class="card" aria-live="polite">
         <div class="spinner" aria-hidden="true"></div>
-        <p>Decrypting share&hellip;</p>
+        <p class="meta">Decrypting share&hellip;</p>
       </section>
 
       <section id="error" class="card hidden" aria-live="polite">
@@ -31,6 +37,6 @@
         </footer>
       </section>
     </main>
-    <script type="module" src="/app.js"></script>
+    <script type="module" src="/app.js?v=1"></script>
   </body>
 </html>

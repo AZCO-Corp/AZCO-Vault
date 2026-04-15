@@ -1,66 +1,92 @@
 :root {
   color-scheme: light dark;
-  --bg: #f5f6f8;
+  --azco-blue: #005db9;
+  --azco-blue-dark: #004892;
+  --azco-blue-bg: #eaf2fb;
+  --azco-red: #ef4135;
+  --bg: #f4f7fb;
   --card-bg: #ffffff;
-  --text: #1a202c;
-  --muted: #667085;
-  --border: #e4e7ec;
-  --accent: #175cd3;
-  --accent-weak: #eff4ff;
-  --danger: #b42318;
-  --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --text: #0f172a;
+  --muted: #64748b;
+  --border: #e2e8f0;
+  --mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 16px rgba(15, 23, 42, 0.06);
 }
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #0f1115;
-    --card-bg: #1a1d23;
-    --text: #ecedee;
-    --muted: #98a2b3;
-    --border: #2c313a;
-    --accent-weak: #1a2332;
+    --bg: #0a1424;
+    --card-bg: #111c30;
+    --text: #eef2f7;
+    --muted: #94a3b8;
+    --border: #1f2c45;
+    --azco-blue-bg: #112646;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 16px rgba(0, 0, 0, 0.5);
   }
 }
+
 * {
   box-sizing: border-box;
 }
+
 html,
 body {
   height: 100%;
   margin: 0;
 }
+
 body {
-  background: var(--bg);
+  background: radial-gradient(ellipse at top, var(--azco-blue-bg), var(--bg) 55%);
   color: var(--text);
   font-family:
     system-ui,
     -apple-system,
-    Segoe UI,
+    "Segoe UI",
     Roboto,
+    "Helvetica Neue",
     sans-serif;
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 48px 16px;
+  padding: 48px 16px 80px;
 }
+
 main {
   width: 100%;
-  max-width: 520px;
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 24px;
 }
+
+.brand {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+.brand img {
+  display: block;
+  height: 42px;
+  width: auto;
+}
+
 .card {
+  width: 100%;
   background: var(--card-bg);
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 18px;
   padding: 28px 28px 20px;
-  box-shadow:
-    0 1px 2px rgba(16, 24, 40, 0.04),
-    0 1px 3px rgba(16, 24, 40, 0.06);
+  box-shadow: var(--shadow);
 }
 .card h1 {
   font-size: 20px;
-  margin: 0 0 4px;
+  line-height: 1.3;
+  margin: 0 0 6px;
+  font-weight: 600;
 }
 .card header {
-  margin-bottom: 20px;
+  margin-bottom: 18px;
 }
 .meta {
   color: var(--muted);
@@ -70,12 +96,13 @@ main {
 .hidden {
   display: none !important;
 }
+
 .spinner {
   width: 28px;
   height: 28px;
-  margin: 8px auto;
+  margin: 4px auto 10px;
   border: 3px solid var(--border);
-  border-top-color: var(--accent);
+  border-top-color: var(--azco-blue);
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
@@ -84,31 +111,33 @@ main {
     transform: rotate(360deg);
   }
 }
+
 .field {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 0;
+  gap: 10px;
+  padding: 12px 0;
   border-bottom: 1px solid var(--border);
 }
 .field:last-child {
   border-bottom: 0;
 }
 .field .label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  width: 100px;
   flex: 0 0 auto;
+  width: 96px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 .field .value {
   flex: 1 1 auto;
   min-width: 0;
   font-family: var(--mono);
   font-size: 14px;
-  overflow-wrap: anywhere;
   word-break: break-word;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 .field .value.masked::before {
@@ -126,40 +155,52 @@ main {
   display: inline;
 }
 .field .actions {
-  display: flex;
-  gap: 4px;
   flex: 0 0 auto;
+  display: flex;
+  gap: 6px;
 }
 .field button {
+  appearance: none;
   background: transparent;
   border: 1px solid var(--border);
   color: var(--text);
   border-radius: 8px;
-  padding: 6px 8px;
+  padding: 6px 10px;
   cursor: pointer;
   font-size: 12px;
+  font-weight: 500;
+  transition:
+    background-color 0.12s,
+    color 0.12s,
+    border-color 0.12s;
 }
 .field button:hover {
-  background: var(--accent-weak);
-  border-color: var(--accent);
-  color: var(--accent);
+  background: var(--azco-blue-bg);
+  border-color: var(--azco-blue);
+  color: var(--azco-blue);
 }
 .field button.copied {
-  color: var(--accent);
-  border-color: var(--accent);
+  background: var(--azco-blue);
+  border-color: var(--azco-blue);
+  color: #ffffff;
 }
+
 .notes-row {
   display: block;
-  padding: 10px 0;
+  padding: 14px 0 4px;
   border-bottom: 1px solid var(--border);
 }
+.notes-row:last-child {
+  border-bottom: 0;
+}
 .notes-row .label {
-  font-size: 11px;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--muted);
-  margin-bottom: 6px;
   display: block;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
 }
 .notes-row .value {
   font-family: var(--mono);
@@ -167,9 +208,12 @@ main {
   white-space: pre-wrap;
   word-break: break-word;
 }
+
 .fine-print {
   color: var(--muted);
   font-size: 11px;
-  margin: 16px 0 0;
   line-height: 1.5;
+  margin: 20px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
 }
