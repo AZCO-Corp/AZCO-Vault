@@ -103,11 +103,27 @@
   }
 }
 
+/* AZCO: kill text-selection across the whole cipher list. Applying
+   user-select: none on the button alone still let the browser start a
+   multi-row text range once mousedown escaped the button's bounds
+   during a click-drag. Applying it to the list wrapper and every
+   descendant prevents the range from ever forming. */
+.list,
+.list * {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .list > button.flex-list-item {
   display: flex;
   align-items: center;
   width: 100%;
   text-align: left;
+  /* AZCO: explicitly mark this element as a drag source. Without -webkit-user-drag: element
+     Chromium treats the click-and-hold as a text range start, painting a multi-row
+     selection highlight even when user-select: none is applied to the container. */
+  -webkit-user-drag: element;
+  cursor: pointer;
 
   .item-icon {
     display: block;

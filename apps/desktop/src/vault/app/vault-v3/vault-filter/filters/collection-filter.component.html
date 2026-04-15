@@ -31,10 +31,13 @@
 } @else {
   <bit-nav-item
     [icon]="collection().node.icon"
-    [forceActiveStyles]="isActive()"
+    [forceActiveStyles]="isActive() || dropHover"
     [text]="displayName()"
     [appA11yTitle]="displayName()"
     (click)="applyFilter($event)"
+    (dragover)="onDropDragOver($event)"
+    (dragleave)="onDropDragLeave()"
+    (drop)="onDrop($event)"
   >
     @if (canEdit()) {
       <button

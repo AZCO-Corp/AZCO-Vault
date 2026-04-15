@@ -36,6 +36,87 @@ export class VaultItemsV2Component<C extends CipherViewLike> extends BaseVaultIt
   // AZCO: fired when an admin picks "Collection" from the + menu.
   readonly onAddCollection = output<void>();
 
+  // AZCO: kill text-selection specifically. preventDefault on `selectstart`
+  // stops Chromium from painting a multi-row highlight on click-drag without
+  // blocking the click or the HTML5 drag session. preventDefault on mousedown
+  // would block drag entirely.
+  onCipherSelectStart(event: Event) {
+    event.preventDefault();
+  }
+
+  // AZCO: HTML5 drag source for cipher rows.
+  onCipherDragStart(event: DragEvent, cipher: any) {
+    // Nuke any text selection that may have started on mousedown. Without
+    // this, Chromium keeps the highlight painted across multiple rows for
+    // the duration of the drag even though only the clicked row is actually
+    // what moves — the selection is cosmetic-only but very distracting.
+    try {
+      window.getSelection()?.removeAllRanges();
+    } catch {
+      /* ignore */
+    }
+    if (!event.dataTransfer || !cipher?.id) {
+      return;
+    }
+    event.dataTransfer.effectAllowed = "move";
+    const payload = {
+      cipherId: cipher.id,
+      organizationId: cipher.organizationId ?? null,
+      name: cipher.name ?? "",
+    };
+    try {
+      event.dataTransfer.setData("application/x-azco-cipher", JSON.stringify(payload));
+      event.dataTransfer.setData("text/plain", cipher.id);
+    } catch {
+      /* drag cancelled */
+    }
+
+    // AZCO: use a custom drag image. Without this, Chromium snapshots the
+    // source button WITH its cdk-virtual-scroll transform applied, which
+    // makes the drag image appear offset and visually overlap neighbor rows
+    // — giving the impression that multiple rows are being dragged. A clean
+    // detached pill sidesteps the problem and reads better anyway.
+    try {
+      const ghost = document.createElement("div");
+      ghost.textContent = cipher.name ?? "item";
+      ghost.setAttribute(
+        "style",
+        [
+          "position: absolute",
+          "top: -1000px",
+          "left: -1000px",
+          "padding: 8px 14px",
+          "background: #005db9",
+          "color: #ffffff",
+          "border-radius: 999px",
+          "font: 600 13px system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+          "box-shadow: 0 4px 12px rgba(0,0,0,0.35)",
+          "pointer-events: none",
+          "white-space: nowrap",
+          "max-width: 320px",
+          "overflow: hidden",
+          "text-overflow: ellipsis",
+        ].join(";"),
+      );
+      document.body.appendChild(ghost);
+      event.dataTransfer.setDragImage(ghost, 14, 14);
+      setTimeout(() => {
+        try {
+          document.body.removeChild(ghost);
+        } catch {
+          /* already removed */
+        }
+      }, 0);
+    } catch {
+      /* setDragImage not supported — fall back to browser default */
+    }
+  }
+
+  onCipherDragEnd() {
+    // eslint-disable-next-line no-console
+    console.log("[AZCO drag] dragend fired");
+  }
+
   protected CipherViewLikeUtils = CipherViewLikeUtils;
 
   constructor(

@@ -15,7 +15,6 @@
         [text]="organization.node.name"
         [appA11yTitle]="organization.node.name"
         [forceActiveStyles]="organization.node.id === activeFilter()?.organizationId"
-        [disableToggleOnClick]="true"
         (click)="applyFilter($event, organization)"
       >
         @for (collection of collectionsForOrg(organization.node.id); track collection.node.id) {
