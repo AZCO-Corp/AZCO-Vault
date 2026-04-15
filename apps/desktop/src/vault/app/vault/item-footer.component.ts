@@ -182,8 +182,10 @@ export class ItemFooterComponent implements OnInit, OnChanges {
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
       const decrypted = await saved.decrypt(userId);
 
-      const env = await firstValueFrom(this.environmentService.environment$);
-      const link = env.getSendUrl() + decrypted.accessId + "/" + decrypted.urlB64Key;
+      // AZCO: point at our own share viewer instead of the underlying Vaultwarden URL,
+      // so recipients never see vw.securusconverting.com. The viewer decrypts client-side
+      // and reverse-proxies only the ciphertext fetch to VW.
+      const link = `https://share.azcocorp.com/#/${decrypted.accessId}/${decrypted.urlB64Key}`;
       this.platformUtilsService.copyToClipboard(link);
 
       const expiryLabel = this.formatExpiryLabel(config.hours);
