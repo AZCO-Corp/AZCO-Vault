@@ -13,7 +13,7 @@ import { IMenubarMenu } from "./menubar";
 // AKA: "FirstMenu" or "MacMenu" - the first menu that shows on all macOs apps
 export class BitwardenMenu extends FirstMenu implements IMenubarMenu {
   readonly id: string = "bitwarden";
-  readonly label: string = "AZCO-Bitwarden";
+  readonly label: string = "AZCO Vault";
 
   get items(): MenuItemConstructorOptions[] {
     const items = [this.aboutBitwarden, this.checkForUpdates];
