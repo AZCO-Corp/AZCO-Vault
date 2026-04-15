@@ -7,23 +7,12 @@
     <app-organization-filter
       [activeFilter]="activeFilter()"
       [organizations]="organizations()"
+      [collections]="collections()"
       [activeOrganizationDataOwnership]="activeOrganizationDataOwnershipPolicy"
       [activeSingleOrganizationPolicy]="activeSingleOrganizationPolicy"
     />
     <app-type-filter [activeFilter]="activeFilter()" [cipherTypes]="cipherTypes()" />
     <app-status-filter [activeFilter]="activeFilter()" />
-    @if (showCollectionsFilter()) {
-      <bit-nav-group
-        icon="bwi-collection"
-        [text]="'collections' | i18n"
-        [appA11yTitle]="'collections' | i18n"
-        [disableToggleOnClick]="true"
-      >
-        @for (collection of collections()?.children ?? []; track collection.node.id) {
-          <app-collection-filter [activeFilter]="activeFilter()" [collection]="collection" />
-        }
-      </bit-nav-group>
-    }
     <bit-nav-group
       icon="bwi-folder"
       [text]="'folders' | i18n"

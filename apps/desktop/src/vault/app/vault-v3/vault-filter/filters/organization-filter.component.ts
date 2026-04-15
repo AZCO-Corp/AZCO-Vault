@@ -12,14 +12,21 @@ import {
   IconModule,
 } from "@bitwarden/components";
 import { I18nPipe } from "@bitwarden/ui-common";
-import { OrganizationFilter, VaultFilter, VaultFilterServiceAbstraction } from "@bitwarden/vault";
+import {
+  CollectionFilter,
+  OrganizationFilter,
+  VaultFilter,
+  VaultFilterServiceAbstraction,
+} from "@bitwarden/vault";
+
+import { CollectionFilterComponent } from "./collection-filter.component";
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
   selector: "app-organization-filter",
   templateUrl: "organization-filter.component.html",
-  imports: [A11yTitleDirective, NavigationModule, I18nPipe, IconModule],
+  imports: [A11yTitleDirective, CollectionFilterComponent, NavigationModule, I18nPipe, IconModule],
 })
 export class OrganizationFilterComponent {
   private toastService: ToastService = inject(ToastService);
@@ -31,6 +38,13 @@ export class OrganizationFilterComponent {
   protected readonly activeFilter = input<VaultFilter>();
   protected readonly activeOrganizationDataOwnership = input<boolean>(false);
   protected readonly activeSingleOrganizationPolicy = input<boolean>(false);
+  // AZCO: collection tree, used to render per-org collections inline.
+  protected readonly collections = input<TreeNode<CollectionFilter> | undefined>(undefined);
+
+  // AZCO: return the top-level collection nodes that belong to a given org.
+  protected collectionsForOrg(orgId: string): TreeNode<CollectionFilter>[] {
+    return (this.collections()?.children ?? []).filter((c) => c.node.organizationId === orgId);
+  }
 
   protected readonly show = computed(() => {
     const hiddenDisplayModes: DisplayMode[] = [

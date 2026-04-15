@@ -15,7 +15,9 @@ const BIT_SIDE_NAV_WIDTH_KEY_DEF = new KeyDefinition<number>(BIT_SIDE_NAV_DISK, 
 })
 export class SideNavService {
   // Units in rem
-  readonly DEFAULT_OPEN_WIDTH = 18;
+  // AZCO: default the side nav to fully expanded so fresh user-data dirs
+  // start with labels visible. Existing saved preferences still win.
+  readonly DEFAULT_OPEN_WIDTH = 24;
   readonly MIN_OPEN_WIDTH = 15;
   readonly MAX_OPEN_WIDTH = 24;
 

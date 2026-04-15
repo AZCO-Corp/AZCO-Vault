@@ -10,13 +10,17 @@
     [disableToggleOnClick]="true"
   >
     @for (organization of organizations().children ?? []; track organization.node.id) {
-      <bit-nav-item
+      <bit-nav-group
         [icon]="organization.node.icon"
-        [forceActiveStyles]="organization.node.id === activeFilter()?.organizationId"
         [text]="organization.node.name"
         [appA11yTitle]="organization.node.name"
+        [forceActiveStyles]="organization.node.id === activeFilter()?.organizationId"
+        [disableToggleOnClick]="true"
         (click)="applyFilter($event, organization)"
       >
+        @for (collection of collectionsForOrg(organization.node.id); track collection.node.id) {
+          <app-collection-filter [activeFilter]="activeFilter()" [collection]="collection" />
+        }
         @if (!organization.node.enabled) {
           <bit-icon
             slot="end"
@@ -25,7 +29,7 @@
             [appA11yTitle]="'organizationIsDisabled' | i18n"
           />
         }
-      </bit-nav-item>
+      </bit-nav-group>
     }
   </bit-nav-group>
 }
