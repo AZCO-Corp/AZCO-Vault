@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shared with you &middot; AZCO</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <section id="loading" class="card" aria-live="polite">
+        <div class="spinner" aria-hidden="true"></div>
+        <p>Decrypting share&hellip;</p>
+      </section>
+
+      <section id="error" class="card hidden" aria-live="polite">
+        <h1>Share unavailable</h1>
+        <p id="error-message">This link is invalid, has expired, or has already been viewed.</p>
+      </section>
+
+      <section id="content" class="card hidden">
+        <header>
+          <h1>Someone shared an item with you.</h1>
+          <p class="meta" id="expiry"></p>
+        </header>
+        <div id="fields"></div>
+        <footer>
+          <p class="fine-print">
+            Fields above are end-to-end encrypted. The decryption key never leaves your browser.
+          </p>
+        </footer>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
