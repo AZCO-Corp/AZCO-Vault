@@ -27,7 +27,7 @@ import { SendType } from "@bitwarden/common/tools/send/types/send-type";
 import { UserId } from "@bitwarden/common/types/guid";
 import { CipherArchiveService } from "@bitwarden/common/vault/abstractions/cipher-archive.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
-import { CipherRepromptType } from "@bitwarden/common/vault/enums";
+import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { ButtonComponent, ButtonModule, DialogService, ToastService } from "@bitwarden/components";
@@ -162,15 +162,7 @@ export class ItemFooterComponent implements OnInit, OnChanges {
         config.audience === "emails" && config.emails.length > 0
           ? `Allowed recipients (UI hint only): ${config.emails.join(", ")}\n\n`
           : "";
-      const body =
-        allowedHeader +
-        [
-          `Name: ${c.name ?? "-"}`,
-          `URL:  ${c.login?.uris?.[0]?.uri ?? "-"}`,
-          `User: ${c.login?.username ?? "-"}`,
-          `Pass: ${c.login?.password ?? "-"}`,
-          c.notes ? `\nNotes:\n${c.notes}` : "",
-        ].join("\n");
+      const body = allowedHeader + this.buildShareBody(c);
 
       const expiresAt = new Date(Date.now() + config.hours * 60 * 60 * 1000);
       const send = new SendView();
@@ -213,6 +205,75 @@ export class ItemFooterComponent implements OnInit, OnChanges {
         message: `Share failed: ${(e as Error)?.message ?? "unknown"}`,
       });
     }
+  }
+
+  // AZCO: format an arbitrary cipher (login/card/identity/securenote/sshkey) as shareable text.
+  private buildShareBody(c: CipherView): string {
+    const rows: { label: string; value: string | undefined | null }[] = [];
+    rows.push({ label: "Name", value: c.name });
+
+    switch (c.type) {
+      case CipherType.Login:
+        rows.push(
+          { label: "URL", value: c.login?.uris?.[0]?.uri },
+          { label: "Username", value: c.login?.username },
+          { label: "Password", value: c.login?.password },
+          { label: "TOTP", value: c.login?.totp },
+        );
+        break;
+      case CipherType.Card: {
+        const exp =
+          c.card?.expMonth && c.card?.expYear ? `${c.card.expMonth}/${c.card.expYear}` : undefined;
+        rows.push(
+          { label: "Cardholder", value: c.card?.cardholderName },
+          { label: "Brand", value: c.card?.brand },
+          { label: "Number", value: c.card?.number },
+          { label: "Expires", value: exp },
+          { label: "CVV", value: c.card?.code },
+        );
+        break;
+      }
+      case CipherType.Identity: {
+        const id = c.identity;
+        const fullName =
+          [id?.firstName, id?.middleName, id?.lastName].filter((x) => !!x).join(" ") || undefined;
+        const address =
+          [id?.address1, id?.address2, id?.city, id?.state, id?.postalCode, id?.country]
+            .filter((x) => !!x)
+            .join(", ") || undefined;
+        rows.push(
+          { label: "Name", value: fullName },
+          { label: "Username", value: id?.username },
+          { label: "Email", value: id?.email },
+          { label: "Phone", value: id?.phone },
+          { label: "Company", value: id?.company },
+          { label: "SSN", value: id?.ssn },
+          { label: "Passport", value: id?.passportNumber },
+          { label: "License", value: id?.licenseNumber },
+          { label: "Address", value: address },
+        );
+        break;
+      }
+      case CipherType.SshKey: {
+        const k = (c as any).sshKey;
+        rows.push(
+          { label: "Public Key", value: k?.publicKey },
+          { label: "Private Key", value: k?.privateKey },
+          { label: "Fingerprint", value: k?.keyFingerprint },
+        );
+        break;
+      }
+      // SecureNote and anything else: just name + notes.
+    }
+
+    const lines = rows
+      .filter((r) => r.value !== undefined && r.value !== null && r.value !== "")
+      .map((r) => `${r.label}: ${r.value}`);
+
+    if (c.notes) {
+      lines.push("", "Notes:", c.notes);
+    }
+    return lines.join("\n");
   }
 
   private formatExpiryLabel(hours: number): string {
