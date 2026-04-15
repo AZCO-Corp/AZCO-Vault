@@ -33,6 +33,11 @@ import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cip
 import { ButtonComponent, ButtonModule, DialogService, ToastService } from "@bitwarden/components";
 import { ArchiveCipherUtilitiesService, PasswordRepromptService } from "@bitwarden/vault";
 
+import {
+  ShareLinkDialogComponent,
+  ShareLinkDialogResult,
+} from "./share-link-dialog/share-link-dialog.component";
+
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
@@ -139,25 +144,35 @@ export class ItemFooterComponent implements OnInit, OnChanges {
   }
 
   // AZCO: share current cipher as a time-limited Bitwarden Send link.
-  // v1 uses hard-coded 7-day / 1-view defaults. Configurable dialog to follow in v2.
+  // Opens a config dialog (expiration, audience, view-once) then creates the Send.
   async shareLink(): Promise<void> {
     if (!(await this.promptPassword())) {
       return;
     }
-    const DAYS = 7;
-    const MAX_VIEWS = 1;
+
+    const dialogRef = ShareLinkDialogComponent.open(this.dialogService);
+    const config = (await firstValueFrom(dialogRef.closed)) as ShareLinkDialogResult | undefined;
+    if (!config) {
+      return;
+    }
 
     try {
       const c = this.cipher;
-      const body = [
-        `Name: ${c.name ?? "-"}`,
-        `URL:  ${c.login?.uris?.[0]?.uri ?? "-"}`,
-        `User: ${c.login?.username ?? "-"}`,
-        `Pass: ${c.login?.password ?? "-"}`,
-        c.notes ? `\nNotes:\n${c.notes}` : "",
-      ].join("\n");
+      const allowedHeader =
+        config.audience === "emails" && config.emails.length > 0
+          ? `Allowed recipients (UI hint only): ${config.emails.join(", ")}\n\n`
+          : "";
+      const body =
+        allowedHeader +
+        [
+          `Name: ${c.name ?? "-"}`,
+          `URL:  ${c.login?.uris?.[0]?.uri ?? "-"}`,
+          `User: ${c.login?.username ?? "-"}`,
+          `Pass: ${c.login?.password ?? "-"}`,
+          c.notes ? `\nNotes:\n${c.notes}` : "",
+        ].join("\n");
 
-      const expiresAt = new Date(Date.now() + DAYS * 24 * 60 * 60 * 1000);
+      const expiresAt = new Date(Date.now() + config.hours * 60 * 60 * 1000);
       const send = new SendView();
       send.name = `AZCO Share: ${c.name ?? "Item"}`;
       send.type = SendType.Text;
@@ -166,7 +181,7 @@ export class ItemFooterComponent implements OnInit, OnChanges {
       send.text.hidden = false;
       send.deletionDate = expiresAt;
       send.expirationDate = expiresAt;
-      send.maxAccessCount = MAX_VIEWS;
+      send.maxAccessCount = config.viewOnce ? 1 : (null as any);
       send.password = null as any;
 
       const sendData = await this.sendService.encrypt(send, null as any, null as any, null);
@@ -179,10 +194,16 @@ export class ItemFooterComponent implements OnInit, OnChanges {
       const link = env.getSendUrl() + decrypted.accessId + "/" + decrypted.urlB64Key;
       this.platformUtilsService.copyToClipboard(link);
 
+      const expiryLabel = this.formatExpiryLabel(config.hours);
+      const viewLabel = config.viewOnce ? ", max 1 view" : "";
+      const audienceWarning =
+        config.audience === "emails"
+          ? " (email restriction is UI-only for now — link is still accessible to anyone who has it)"
+          : "";
       this.toastService.showToast({
         variant: "success",
         title: null,
-        message: `Share link copied — expires in ${DAYS} days, max ${MAX_VIEWS} view.`,
+        message: `Share link copied — expires in ${expiryLabel}${viewLabel}.${audienceWarning}`,
       });
     } catch (e) {
       this.logService.error(e);
@@ -192,6 +213,14 @@ export class ItemFooterComponent implements OnInit, OnChanges {
         message: `Share failed: ${(e as Error)?.message ?? "unknown"}`,
       });
     }
+  }
+
+  private formatExpiryLabel(hours: number): string {
+    if (hours < 24) {
+      return `${hours} hour${hours === 1 ? "" : "s"}`;
+    }
+    const days = Math.round(hours / 24);
+    return `${days} day${days === 1 ? "" : "s"}`;
   }
 
   protected get hasFooterAction() {

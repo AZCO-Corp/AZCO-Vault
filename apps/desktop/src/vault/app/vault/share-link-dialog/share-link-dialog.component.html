@@ -1,0 +1,49 @@
+<bit-dialog dialogSize="default" background="alt">
+  <span bitDialogTitle>Share item as link</span>
+  <ng-container bitDialogContent>
+    <form [formGroup]="form" class="tw-flex tw-flex-col tw-gap-4">
+      <bit-radio-group formControlName="hours" aria-label="Link expiration">
+        <bit-label>Link expires in</bit-label>
+        @for (p of hourPresets; track p.hours) {
+          <bit-radio-button [id]="'azco-exp-' + p.hours" [value]="p.hours">
+            <bit-label>{{ p.label }}</bit-label>
+          </bit-radio-button>
+        }
+      </bit-radio-group>
+
+      <bit-radio-group formControlName="audience" aria-label="Who can access">
+        <bit-label>Available to</bit-label>
+        <bit-radio-button id="azco-aud-public" value="public">
+          <bit-label>Anyone with the link</bit-label>
+        </bit-radio-button>
+        <bit-radio-button id="azco-aud-emails" value="emails">
+          <bit-label>Only specific people…</bit-label>
+        </bit-radio-button>
+      </bit-radio-group>
+
+      @if (audienceValue === "emails") {
+        <bit-form-field>
+          <bit-label>Allowed emails</bit-label>
+          <textarea
+            bitInput
+            formControlName="emailsText"
+            rows="3"
+            placeholder="alice&#64;example.com, bob&#64;example.com"
+          ></textarea>
+          <bit-hint>
+            Comma or newline separated. UI-only in this build — email-gated access (2FA code) lands
+            in a future update.
+          </bit-hint>
+        </bit-form-field>
+      }
+
+      <bit-switch formControlName="viewOnce">
+        <bit-label>Can only be viewed one time</bit-label>
+      </bit-switch>
+    </form>
+  </ng-container>
+  <ng-container bitDialogFooter>
+    <button type="button" bitButton buttonType="primary" (click)="submit()">Generate link</button>
+    <button type="button" bitButton buttonType="secondary" (click)="cancel()">Cancel</button>
+  </ng-container>
+</bit-dialog>
