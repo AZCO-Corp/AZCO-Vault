@@ -1,17 +1,21 @@
+<!-- AZCO: flatten the top padding so the wide AZCO wordmark sits flush
+     with the top of the sidebar instead of floating with extra whitespace
+     above it. Upstream Bitwarden's shield logo is narrow and reads fine
+     centered; ours is a tall banner and the original padding wasted space. -->
 <div
   class="tw-px-2 tw-bg-bg-nav"
   [ngClass]="{
-    'tw-sticky tw-top-0 tw-z-50 tw-pb-4': sideNavService.open(),
+    'tw-sticky tw-top-0 tw-z-50 tw-pb-2': sideNavService.open(),
     'tw-pb-[calc(theme(spacing.8)_+_2px)]': !sideNavService.open(),
-    'tw-pt-[calc(0.5rem_+_var(--bit-sidenav-extra-top-padding,_0px))]': sideNavService.isOverlay(),
-    'tw-pt-2': !sideNavService.isOverlay(),
+    'tw-pt-[calc(0.25rem_+_var(--bit-sidenav-extra-top-padding,_0px))]': sideNavService.isOverlay(),
+    'tw-pt-0': !sideNavService.isOverlay(),
   }"
 >
   <!-- absolutely position the link svg to avoid shifting layout when sidenav is closed -->
   <a
     [routerLink]="route()"
-    class="tw-relative tw-p-3 tw-block tw-rounded-md tw-outline-none focus-visible:tw-ring focus-visible:tw-ring-inset focus-visible:tw-ring-border-nav-focus hover:tw-bg-bg-nav-hover tw-h-[73px] [&_svg]:tw-absolute [&_svg]:tw-inset-[.6875rem] [&_svg]:tw-w-[200px]"
-    [class]="!sideNavService.open() ? '!tw-h-[55px] [&_svg]:!tw-w-[26px]' : ''"
+    class="tw-relative tw-p-1 tw-block tw-rounded-md tw-outline-none focus-visible:tw-ring focus-visible:tw-ring-inset focus-visible:tw-ring-border-nav-focus hover:tw-bg-bg-nav-hover tw-h-[60px] [&_svg]:tw-absolute [&_svg]:tw-inset-[.25rem] [&_svg]:tw-w-[210px]"
+    [class]="!sideNavService.open() ? '!tw-h-[48px] [&_svg]:!tw-w-[26px]' : ''"
     [attr.aria-label]="label()"
     [title]="label()"
     routerLinkActive
