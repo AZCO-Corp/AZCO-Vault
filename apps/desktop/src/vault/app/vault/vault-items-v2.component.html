@@ -101,5 +101,9 @@
       <i class="bwi bwi-folder tw-mr-1" aria-hidden="true"></i>
       {{ "folder" | i18n }}
     </button>
+    <button type="button" bitMenuItem (click)="onAddCollection.emit()">
+      <i class="bwi bwi-collection-shared tw-mr-1" aria-hidden="true"></i>
+      {{ "collection" | i18n }}
+    </button>
   </bit-menu>
 </ng-template>

@@ -6,8 +6,10 @@
           [canCreateCipher]="true"
           [canCreateFolder]="true"
           [canCreateSshKey]="true"
+          [canCreateCollection]="true"
           (cipherAdded)="addCipher($event)"
           (folderAdded)="addFolder()"
+          (collectionAdded)="addCollection()"
         />
       </app-header>
     </div>
@@ -37,6 +39,7 @@
       (onEvent)="onVaultItemsEvent($event)"
       (onAddCipher)="addCipher($event)"
       (onAddFolder)="addFolder()"
+      (onAddCollection)="addCollection()"
     />
   </div>
   @if (!!action()) {

@@ -885,6 +885,14 @@ export class VaultComponent implements OnInit, OnDestroy, CopyClickListener {
     this.messagingService.send("newFolder");
   }
 
+  // AZCO: open the CollectionAdminDialog in create mode. The dialog does its
+  // own permission gate and org picker so we don't need any vault-orig state.
+  async addCollection() {
+    const { CollectionAdminDialogComponent } =
+      await import("./vault-filter/collection-admin-dialog/collection-admin-dialog.component");
+    CollectionAdminDialogComponent.open(this.dialogService, { data: {} });
+  }
+
   async editFolder(folderId: string) {
     if (!this.activeUserId) {
       return;

@@ -126,6 +126,7 @@ import { DesktopPremiumUpgradePromptService } from "../../../services/desktop-pr
 import { AssignCollectionsDesktopComponent } from "../vault/assign-collections";
 import { ItemFooterComponent } from "../vault/item-footer.component";
 
+import { CollectionAdminDialogComponent } from "./vault-filter/collection-admin-dialog/collection-admin-dialog.component";
 import { VaultItemEvent } from "./vault-items/vault-item-event";
 import { VaultListComponent } from "./vault-list.component";
 
@@ -777,6 +778,23 @@ export class VaultComponent<C extends CipherViewLike>
       );
       await this.savedCipher(updatedCipher);
     }
+  }
+
+  // AZCO: true if the signed-in user can manage collections in any of the
+  // organizations currently accessible to them. We gate on Admin/Owner role
+  // rather than canEditAnyCollection, because that flag requires the org's
+  // allowAdminAccessToAllCollectionItems setting — Vaultwarden returns it
+  // as false by default, which would hide the button from real admins.
+  canCreateCollection(): boolean {
+    return (this.allOrganizations ?? []).some(
+      (o) => (o as any).isAdmin || (o as any).isOwner || (o as any).canCreateNewCollections,
+    );
+  }
+
+  // AZCO: opens the CollectionAdminDialog in create mode. The dialog handles
+  // its own org picker when the user has more than one eligible organization.
+  async addCollection(): Promise<void> {
+    CollectionAdminDialogComponent.open(this.dialogService, { data: {} });
   }
 
   async addCipher(type?: CipherType) {

@@ -1,64 +1,147 @@
 <bit-dialog dialogSize="large" background="alt">
   <span bitDialogTitle>
     {{ editMode ? "Edit collection" : "New collection" }}
-    @if (orgName) {
-      <span class="tw-text-muted tw-font-normal tw-text-sm tw-ml-2">in {{ orgName }}</span>
-    }
   </span>
 
   <ng-container bitDialogContent>
-    <form [formGroup]="form" class="tw-flex tw-flex-col tw-gap-4">
-      <bit-form-field>
-        <bit-label>Name</bit-label>
-        <input
-          bitInput
-          type="text"
-          formControlName="name"
-          placeholder="e.g. Engineering, Engineering/Frontend"
-          autocomplete="off"
-        />
-        <bit-hint>
-          Use a forward slash in the name to nest (for example, "Engineering/Frontend").
-        </bit-hint>
-      </bit-form-field>
-
-      <div class="tw-mt-2">
-        <h3
-          class="tw-text-sm tw-font-semibold tw-text-muted tw-uppercase tw-tracking-wider tw-mb-2"
-        >
-          Members
-        </h3>
-
-        @if (loading) {
-          <p class="tw-text-muted tw-text-sm">Loading members…</p>
-        } @else if (members.length === 0) {
-          <p class="tw-text-muted tw-text-sm">No confirmed members in this organization.</p>
+    @if (loading) {
+      <p class="tw-text-muted tw-text-sm">Loading…</p>
+    } @else {
+      <form [formGroup]="form" class="tw-flex tw-flex-col tw-gap-4">
+        @if (showOrgPicker) {
+          <bit-form-field>
+            <bit-label>Organization</bit-label>
+            <select
+              bitInput
+              formControlName="organizationId"
+              (change)="onOrgChange(form.controls.organizationId.value)"
+            >
+              @for (org of availableOrgs; track org.id) {
+                <option [value]="org.id">{{ org.name }}</option>
+              }
+            </select>
+          </bit-form-field>
+        } @else if (!editMode) {
+          <p class="tw-text-muted tw-text-xs tw-m-0">
+            Creating in <strong>{{ availableOrgs[0]?.name }}</strong>
+          </p>
         } @else {
-          <div
-            class="tw-border tw-border-secondary-300 tw-rounded-md tw-divide-y tw-divide-secondary-300 tw-max-h-80 tw-overflow-y-auto"
+          <p class="tw-text-muted tw-text-xs tw-m-0">
+            Editing in <strong>{{ availableOrgs[0]?.name || "organization" }}</strong>
+          </p>
+        }
+
+        <bit-form-field>
+          <bit-label>Parent collection</bit-label>
+          <select bitInput formControlName="parentId">
+            @for (p of parentOptions; track p.id) {
+              <option [value]="p.id">{{ p.fullName }}</option>
+            }
+          </select>
+          <bit-hint>
+            Pick an existing collection to nest under it, or "— none —" for top level.
+          </bit-hint>
+        </bit-form-field>
+
+        <bit-form-field>
+          <bit-label>Name</bit-label>
+          <input
+            bitInput
+            type="text"
+            formControlName="leafName"
+            placeholder="e.g. Engineering"
+            autocomplete="off"
+          />
+        </bit-form-field>
+
+        <div class="tw-mt-2">
+          <h3
+            class="tw-text-sm tw-font-semibold tw-text-muted tw-uppercase tw-tracking-wider tw-mb-2"
           >
-            @for (member of members; track member.id) {
-              <div class="tw-flex tw-items-center tw-gap-3 tw-px-3 tw-py-2">
-                <div class="tw-flex-1 tw-min-w-0">
-                  <div class="tw-font-medium tw-text-sm tw-truncate">{{ member.name }}</div>
-                  <div class="tw-text-xs tw-text-muted tw-truncate">{{ member.email }}</div>
-                </div>
-                <select
-                  class="tw-border tw-border-secondary-300 tw-rounded tw-px-2 tw-py-1 tw-text-sm tw-bg-background tw-text-main"
-                  [(ngModel)]="member.permission"
-                  [ngModelOptions]="{ standalone: true }"
-                  [attr.aria-label]="'Permission for ' + member.name"
-                >
-                  @for (opt of permissionOptions; track opt.value) {
-                    <option [value]="opt.value">{{ opt.label }}</option>
+            Members
+          </h3>
+          @if (loadingOrgContext) {
+            <p class="tw-text-muted tw-text-sm">Loading members…</p>
+          } @else if (members.length === 0) {
+            <p class="tw-text-muted tw-text-sm">No members in this organization.</p>
+          } @else {
+            <p class="tw-text-muted tw-text-xs tw-mb-2">
+              You'll always keep manage access on collections you create.
+            </p>
+            <table
+              class="tw-w-full tw-border tw-border-secondary-300 tw-rounded-md tw-overflow-hidden"
+            >
+              <tbody class="tw-divide-y tw-divide-secondary-300">
+                @for (member of members; track member.id) {
+                  <tr>
+                    <td class="tw-px-3 tw-py-2 tw-align-middle">
+                      <div class="tw-font-medium tw-text-sm tw-text-main">{{ member.name }}</div>
+                      @if (member.email && member.email !== member.name) {
+                        <div class="tw-text-xs tw-text-muted">{{ member.email }}</div>
+                      }
+                    </td>
+                    <td class="tw-px-3 tw-py-2 tw-align-middle tw-text-right" style="width: 220px">
+                      <select
+                        class="tw-border tw-border-secondary-300 tw-rounded tw-px-2 tw-py-1 tw-text-sm tw-bg-background tw-text-main tw-w-full"
+                        [(ngModel)]="member.permission"
+                        [ngModelOptions]="{ standalone: true }"
+                        [attr.aria-label]="'Permission for ' + member.name"
+                      >
+                        @for (opt of permissionOptions; track opt.value) {
+                          <option [value]="opt.value">{{ opt.label }}</option>
+                        }
+                      </select>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </div>
+
+        @if (groups.length > 0 || loadingOrgContext) {
+          <div class="tw-mt-2">
+            <h3
+              class="tw-text-sm tw-font-semibold tw-text-muted tw-uppercase tw-tracking-wider tw-mb-2"
+            >
+              Groups
+            </h3>
+            @if (loadingOrgContext) {
+              <p class="tw-text-muted tw-text-sm">Loading groups…</p>
+            } @else {
+              <table
+                class="tw-w-full tw-border tw-border-secondary-300 tw-rounded-md tw-overflow-hidden"
+              >
+                <tbody class="tw-divide-y tw-divide-secondary-300">
+                  @for (group of groups; track group.id) {
+                    <tr>
+                      <td class="tw-px-3 tw-py-2 tw-align-middle">
+                        <div class="tw-font-medium tw-text-sm tw-text-main">{{ group.name }}</div>
+                      </td>
+                      <td
+                        class="tw-px-3 tw-py-2 tw-align-middle tw-text-right"
+                        style="width: 220px"
+                      >
+                        <select
+                          class="tw-border tw-border-secondary-300 tw-rounded tw-px-2 tw-py-1 tw-text-sm tw-bg-background tw-text-main tw-w-full"
+                          [(ngModel)]="group.permission"
+                          [ngModelOptions]="{ standalone: true }"
+                          [attr.aria-label]="'Permission for group ' + group.name"
+                        >
+                          @for (opt of permissionOptions; track opt.value) {
+                            <option [value]="opt.value">{{ opt.label }}</option>
+                          }
+                        </select>
+                      </td>
+                    </tr>
                   }
-                </select>
-              </div>
+                </tbody>
+              </table>
             }
           </div>
         }
-      </div>
-    </form>
+      </form>
+    }
   </ng-container>
 
   <ng-container bitDialogFooter>
@@ -66,7 +149,7 @@
       type="button"
       bitButton
       buttonType="primary"
-      [disabled]="saving || loading"
+      [disabled]="saving || loading || loadingOrgContext"
       (click)="save()"
     >
       {{ editMode ? "Save changes" : "Create collection" }}

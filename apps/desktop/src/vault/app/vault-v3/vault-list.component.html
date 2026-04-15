@@ -92,8 +92,10 @@
           [canCreateCipher]="true"
           [canCreateFolder]="true"
           [canCreateSshKey]="true"
+          [canCreateCollection]="canCreateCollection()"
           (cipherAdded)="addCipher($event)"
           (folderAdded)="addFolder()"
+          (collectionAdded)="onAddCollection.emit()"
           slot="button"
         />
       }

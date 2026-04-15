@@ -1,4 +1,4 @@
-import { Component, input, computed } from "@angular/core";
+import { Component, input, computed, output } from "@angular/core";
 
 import { TreeNode } from "@bitwarden/common/vault/models/domain/tree-node";
 import { NavigationModule, A11yTitleDirective } from "@bitwarden/components";
@@ -14,6 +14,10 @@ import { VaultFilter, CollectionFilter } from "@bitwarden/vault";
 export class CollectionFilterComponent {
   protected readonly collection = input.required<TreeNode<CollectionFilter>>();
   protected readonly activeFilter = input<VaultFilter>();
+  // AZCO: when true, a pencil edit affordance is rendered next to the
+  // collection row and the editCollection output fires on click.
+  readonly canEdit = input<boolean>(false);
+  readonly editCollection = output<TreeNode<CollectionFilter>>();
 
   protected readonly displayName = computed<string>(() => {
     return this.collection().node.name;
@@ -34,5 +38,11 @@ export class CollectionFilterComponent {
     if (filter) {
       filter.selectedCollectionNode = this.collection();
     }
+  }
+
+  protected onEditClick(event: Event) {
+    event.stopPropagation();
+    event.preventDefault();
+    this.editCollection.emit(this.collection());
   }
 }

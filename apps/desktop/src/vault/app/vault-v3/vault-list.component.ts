@@ -87,6 +87,19 @@ export class VaultListComponent<C extends CipherViewLike> {
   protected onEvent = output<VaultItemEvent<C>>();
   protected onAddCipher = output<CipherType>();
   protected onAddFolder = output<void>();
+  // AZCO: fired when an admin picks "Collection" from the add-item menu.
+  readonly onAddCollection = output<void>();
+
+  // AZCO: surface the Collection menu item only when the user is Admin/Owner
+  // (or explicitly granted createNewCollections) on at least one of the
+  // accessible organizations. We don't gate on canEditAnyCollection because
+  // that getter requires the org's allowAdminAccessToAllCollectionItems flag,
+  // which Vaultwarden returns as false by default.
+  protected readonly canCreateCollection = computed<boolean>(() =>
+    (this.allOrganizations() ?? []).some(
+      (o) => (o as any).isAdmin || (o as any).isOwner || (o as any).canCreateNewCollections,
+    ),
+  );
 
   protected cipherAuthorizationService = inject(CipherAuthorizationService);
   protected restrictedItemTypesService = inject(RestrictedItemTypesService);

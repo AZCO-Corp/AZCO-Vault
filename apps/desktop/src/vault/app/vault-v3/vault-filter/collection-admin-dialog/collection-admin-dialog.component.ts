@@ -1,11 +1,13 @@
-// AZCO: create / rename / delete collections with per-member access.
-// Surfaces the existing CollectionAdminService + OrganizationUserApiService
-// (both already provided in the desktop DI container) through a small
-// dialog reachable from the org filter nav group.
+// AZCO: create / rename / delete collections with per-member and per-group
+// access, reachable from the "+ New collection" entry in the vault list's
+// add-item menu and from the pencil affordance on each existing collection
+// in the sidebar. The caller may or may not pre-select an organization; if
+// none is passed, the dialog renders an organization picker based on the
+// orgs where the current user has canEditAnyCollection.
 
 import { DialogConfig } from "@angular/cdk/dialog";
 import { CommonModule } from "@angular/common";
-import { Component, inject, Inject, OnInit } from "@angular/core";
+import { Component, Inject, OnInit, inject } from "@angular/core";
 import {
   FormControl,
   FormGroup,
@@ -24,17 +26,18 @@ import {
 import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrganizationService } from "@bitwarden/common/admin-console/abstractions/organization/organization.service.abstraction";
-import { OrganizationUserStatusType } from "@bitwarden/common/admin-console/enums";
 import {
   CollectionAccessSelectionView,
   CollectionAdminView,
 } from "@bitwarden/common/admin-console/models/collections";
+import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { EncryptService } from "@bitwarden/common/key-management/crypto/abstractions/encrypt.service";
-import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
+import { SyncService } from "@bitwarden/common/platform/sync";
 import { CollectionId, OrganizationId } from "@bitwarden/common/types/guid";
+import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import {
   ButtonModule,
   DIALOG_DATA,
@@ -57,8 +60,20 @@ interface MemberRow {
   permission: PermissionPreset;
 }
 
+interface GroupRow {
+  id: string;
+  name: string;
+  permission: PermissionPreset;
+}
+
+interface ParentOption {
+  id: string; // "" = top level
+  fullName: string;
+}
+
 export interface CollectionAdminDialogParams {
-  organizationId: string;
+  /** When omitted, the dialog shows an org picker. */
+  organizationId?: string;
   /** When present, the dialog is in edit mode for this existing collection. */
   collection?: CollectionAdminView;
 }
@@ -66,7 +81,9 @@ export interface CollectionAdminDialogParams {
 export type CollectionAdminDialogResult = "saved" | "deleted" | "canceled";
 
 type CollectionForm = FormGroup<{
-  name: FormControl<string>;
+  organizationId: FormControl<string>;
+  parentId: FormControl<string>;
+  leafName: FormControl<string>;
 }>;
 
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -85,7 +102,7 @@ type CollectionForm = FormGroup<{
   ],
   // CollectionAdminService has no global provider in the desktop app (it's
   // only registered for apps/web). DefaultCollectionAdminService itself isn't
-  // @Injectable()-decorated, so we construct it via a factory with explicit
+  // @Injectable-decorated, so we construct it via a factory with explicit
   // deps. All of the underlying services are already provided globally in
   // apps/desktop/src/app/services/services.module.ts.
   providers: [
@@ -110,27 +127,41 @@ type CollectionForm = FormGroup<{
   ],
 })
 export class CollectionAdminDialogComponent implements OnInit {
+  private apiService = inject(ApiService);
   private collectionAdminService = inject(CollectionAdminService);
   private organizationUserApiService = inject(OrganizationUserApiService);
   private organizationService = inject(OrganizationService);
   private accountService = inject(AccountService);
   private dialogService = inject(DialogService);
   private toastService = inject(ToastService);
-  private i18nService = inject(I18nService);
   private logService = inject(LogService);
+  private syncService = inject(SyncService);
+  private cipherService = inject(CipherService);
 
   protected loading = true;
+  protected loadingOrgContext = false;
   protected saving = false;
-  protected orgName = "";
+  protected cipherCount = 0;
+
+  protected availableOrgs: Organization[] = [];
+  protected members: MemberRow[] = [];
+  protected groups: GroupRow[] = [];
+  protected parentOptions: ParentOption[] = [];
+
+  private currentUserOrganizationUserId: string | null = null;
+  private existingAdminView: CollectionAdminView | null = null;
 
   protected form: CollectionForm = new FormGroup({
-    name: new FormControl<string>("", {
+    organizationId: new FormControl<string>("", {
       nonNullable: true,
-      validators: [Validators.required, Validators.maxLength(1000)],
+      validators: [Validators.required],
+    }),
+    parentId: new FormControl<string>("", { nonNullable: true }),
+    leafName: new FormControl<string>("", {
+      nonNullable: true,
+      validators: [Validators.required, Validators.maxLength(500)],
     }),
   });
-
-  protected members: MemberRow[] = [];
 
   protected readonly permissionOptions: { value: PermissionPreset; label: string }[] = [
     { value: "none", label: "No access" },
@@ -150,48 +181,197 @@ export class CollectionAdminDialogComponent implements OnInit {
     return this.data.collection != null;
   }
 
+  get showOrgPicker(): boolean {
+    return !this.editMode && this.availableOrgs.length > 1;
+  }
+
   async ngOnInit(): Promise<void> {
     try {
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
-      const orgs = await firstValueFrom(this.organizationService.organizations$(userId));
-      const org = orgs.find((o) => o.id === this.data.organizationId);
-      this.orgName = org?.name ?? "";
-
-      // Fetch the full list of org members to build the picker.
-      const usersList = await this.organizationUserApiService.getAllMiniUserDetails(
-        this.data.organizationId,
-      );
-      const accepted = (usersList?.data ?? []).filter(
-        (u) => u.status === OrganizationUserStatusType.Confirmed,
+      const allOrgs = await firstValueFrom(this.organizationService.organizations$(userId));
+      // Only orgs where the signed-in user can manage collections. Admin/Owner
+      // role is the right gate here — canEditAnyCollection requires the org's
+      // allowAdminAccessToAllCollectionItems setting, which Vaultwarden returns
+      // as false by default.
+      this.availableOrgs = (allOrgs ?? []).filter(
+        (o) => (o as any).isAdmin || (o as any).isOwner || (o as any).canCreateNewCollections,
       );
 
-      // Seed the member rows, marking the existing permission if we're editing.
-      const existing = new Map<string, CollectionAccessSelectionView>();
-      if (this.editMode) {
-        this.form.controls.name.setValue(this.data.collection!.name);
-        for (const u of this.data.collection!.users ?? []) {
-          existing.set(u.id, u);
-        }
+      if (this.availableOrgs.length === 0) {
+        this.toastService.showToast({
+          variant: "error",
+          title: null,
+          message: "You don't have permission to manage collections in any organization.",
+        });
+        this.dialogRef.close("canceled");
+        return;
       }
 
-      this.members = accepted
-        .map<MemberRow>((u) => ({
-          id: u.id,
-          name: u.name || u.email,
-          email: u.email,
-          permission: this.toPreset(existing.get(u.id)),
-        }))
-        .sort((a, b) => a.name.localeCompare(b.name));
+      // Decide the initial org: explicit > edit target > first available.
+      let initialOrgId =
+        this.data.organizationId ??
+        this.data.collection?.organizationId?.toString() ??
+        this.availableOrgs[0].id;
+      if (!this.availableOrgs.some((o) => o.id === initialOrgId)) {
+        initialOrgId = this.availableOrgs[0].id;
+      }
+      this.form.controls.organizationId.setValue(initialOrgId);
+
+      // Editing is org-locked — you can't move a collection between orgs.
+      if (this.editMode) {
+        this.form.controls.organizationId.disable();
+      }
+
+      await this.loadOrgContext(initialOrgId);
+
+      // Prefill the name fields from the existing collection (edit mode).
+      if (this.editMode && this.existingAdminView) {
+        this.applyNameToForm(this.existingAdminView.name);
+      }
     } catch (e) {
       this.logService.error(e);
       this.toastService.showToast({
         variant: "error",
         title: null,
-        message: "Could not load organization members.",
+        message: "Could not load organization data.",
       });
     } finally {
       this.loading = false;
     }
+  }
+
+  /**
+   * Fetch everything that depends on the selected org: full admin views for
+   * the parent-collection picker, member list, group list, and (edit mode
+   * only) the ciphered items count for the delete confirmation.
+   */
+  protected async loadOrgContext(orgId: string): Promise<void> {
+    if (!orgId) {
+      return;
+    }
+    this.loadingOrgContext = true;
+    try {
+      const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+      const org = this.availableOrgs.find((o) => o.id === orgId);
+      this.currentUserOrganizationUserId = (org as any)?.organizationUserId ?? null;
+
+      // --- Collection admin views (parent picker + existing users/groups) ---
+      let adminViews: CollectionAdminView[] = [];
+      try {
+        adminViews = await firstValueFrom(
+          this.collectionAdminService.collectionAdminViews$(orgId, userId),
+        );
+      } catch (e) {
+        this.logService.error(e);
+        adminViews = [];
+      }
+
+      // Parent picker: all collections in the org, minus the one being edited.
+      const editId = this.editMode ? this.data.collection?.id?.toString() : null;
+      this.parentOptions = [
+        { id: "", fullName: "— none (top level) —" },
+        ...adminViews
+          .filter((c) => c.id?.toString() !== editId)
+          .map<ParentOption>((c) => ({ id: c.id!.toString(), fullName: c.name }))
+          .sort((a, b) => a.fullName.localeCompare(b.fullName)),
+      ];
+
+      // If we're editing, stash the fresh admin view so users/groups prefill.
+      if (this.editMode && editId) {
+        this.existingAdminView = adminViews.find((c) => c.id?.toString() === editId) ?? null;
+      } else {
+        this.existingAdminView = null;
+      }
+
+      // --- Members ---
+      const usersList = await this.organizationUserApiService.getAllMiniUserDetails(orgId);
+      const allUsers = usersList?.data ?? [];
+      const existingUserMap = new Map<string, CollectionAccessSelectionView>();
+      for (const u of this.existingAdminView?.users ?? []) {
+        existingUserMap.set(u.id, u);
+      }
+      this.members = allUsers
+        .map<MemberRow>((u) => ({
+          id: u.id,
+          name: u.name?.trim() || u.email || "(unnamed user)",
+          email: u.email ?? "",
+          permission: this.toPreset(existingUserMap.get(u.id)),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      // --- Groups (via direct HTTP; no shared lib service exists in libs/common) ---
+      try {
+        const groupsResp: any = await this.apiService.send(
+          "GET",
+          `/organizations/${orgId}/groups/details`,
+          null,
+          true,
+          true,
+        );
+        const groupList: Array<{ id: string; name: string }> = (groupsResp?.data ?? []).map(
+          (g: any) => ({ id: g.id ?? g.Id, name: g.name ?? g.Name }),
+        );
+        const existingGroupMap = new Map<string, CollectionAccessSelectionView>();
+        for (const g of this.existingAdminView?.groups ?? []) {
+          existingGroupMap.set(g.id, g);
+        }
+        this.groups = groupList
+          .map<GroupRow>((g) => ({
+            id: g.id,
+            name: g.name ?? "(unnamed group)",
+            permission: this.toPreset(existingGroupMap.get(g.id)),
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      } catch {
+        // VW instances without groups support, or network hiccup — just hide the section.
+        this.groups = [];
+      }
+
+      // --- Cipher count for delete confirmation (edit mode only) ---
+      if (this.editMode && editId) {
+        try {
+          const allCiphers = await firstValueFrom(this.cipherService.cipherViews$(userId));
+          this.cipherCount = (allCiphers ?? []).filter((c) =>
+            (c.collectionIds ?? []).map((x) => x?.toString()).includes(editId),
+          ).length;
+        } catch {
+          this.cipherCount = 0;
+        }
+      }
+    } finally {
+      this.loadingOrgContext = false;
+    }
+  }
+
+  /**
+   * Split a "Parent/Child/Grand" name into parent selection + leaf.
+   * If the parent doesn't exist in the fresh parentOptions list, we fall back
+   * to treating the entire name as the leaf.
+   */
+  private applyNameToForm(fullName: string): void {
+    const lastSlash = fullName.lastIndexOf("/");
+    if (lastSlash < 0) {
+      this.form.controls.parentId.setValue("");
+      this.form.controls.leafName.setValue(fullName);
+      return;
+    }
+    const parentName = fullName.slice(0, lastSlash);
+    const leaf = fullName.slice(lastSlash + 1);
+    const parent = this.parentOptions.find((p) => p.fullName === parentName);
+    if (parent) {
+      this.form.controls.parentId.setValue(parent.id);
+      this.form.controls.leafName.setValue(leaf);
+    } else {
+      this.form.controls.parentId.setValue("");
+      this.form.controls.leafName.setValue(fullName);
+    }
+  }
+
+  protected async onOrgChange(orgId: string): Promise<void> {
+    if (this.editMode) {
+      return;
+    }
+    await this.loadOrgContext(orgId);
   }
 
   private toPreset(sel: CollectionAccessSelectionView | undefined): PermissionPreset {
@@ -207,20 +387,16 @@ export class CollectionAdminDialogComponent implements OnInit {
     return sel.hidePasswords ? "editHidden" : "edit";
   }
 
-  private fromPreset(
-    preset: PermissionPreset,
-    userId: string,
-  ): CollectionAccessSelectionView | null {
+  private fromPreset(preset: PermissionPreset, id: string): CollectionAccessSelectionView | null {
     if (preset === "none") {
       return null;
     }
-    const sel = new CollectionAccessSelectionView({
-      id: userId,
+    return new CollectionAccessSelectionView({
+      id,
       readOnly: preset === "view" || preset === "viewHidden",
       hidePasswords: preset === "viewHidden" || preset === "editHidden",
       manage: preset === "manage",
     });
-    return sel;
   }
 
   protected async save(): Promise<void> {
@@ -231,38 +407,84 @@ export class CollectionAdminDialogComponent implements OnInit {
     this.saving = true;
     try {
       const userId = await firstValueFrom(this.accountService.activeAccount$.pipe(getUserId));
+      const orgId = this.form.controls.organizationId.value;
+      const parentId = this.form.controls.parentId.value;
+      const leafName = this.form.controls.leafName.value.trim();
 
-      const name = this.form.controls.name.value.trim();
+      if (!leafName) {
+        this.toastService.showToast({
+          variant: "error",
+          title: null,
+          message: "Name is required.",
+        });
+        this.saving = false;
+        return;
+      }
+
+      let fullName = leafName;
+      if (parentId) {
+        const parent = this.parentOptions.find((p) => p.id === parentId);
+        if (parent) {
+          fullName = `${parent.fullName}/${leafName}`;
+        }
+      }
+
       const view = this.editMode
         ? Object.assign(
             new CollectionAdminView({
               id: this.data.collection!.id as CollectionId,
-              organizationId: this.data.organizationId as OrganizationId,
-              name,
+              organizationId: orgId as OrganizationId,
+              name: fullName,
             }),
-            this.data.collection,
+            this.existingAdminView ?? this.data.collection,
           )
         : new CollectionAdminView({
             id: undefined as unknown as CollectionId,
-            organizationId: this.data.organizationId as OrganizationId,
-            name,
+            organizationId: orgId as OrganizationId,
+            name: fullName,
           });
-      view.name = name;
-      view.organizationId = this.data.organizationId as OrganizationId;
+      view.name = fullName;
+      view.organizationId = orgId as OrganizationId;
 
-      view.users = this.members
+      const selectedUsers = this.members
         .map((m) => this.fromPreset(m.permission, m.id))
         .filter((s): s is CollectionAccessSelectionView => s != null);
 
-      // Preserve any existing group assignments when editing; we don't manage groups in v1.
-      if (!this.editMode) {
-        view.groups = [];
+      // CRITICAL: always include the creating/editing admin with "manage"
+      // permission. Without this, DefaultCollectionAdminService.updateLocalCollections
+      // treats the response's `assigned=false` flag as "delete from local cache",
+      // which makes the collection vanish from the sidebar immediately after save.
+      if (
+        this.currentUserOrganizationUserId &&
+        !selectedUsers.some((u) => u.id === this.currentUserOrganizationUserId)
+      ) {
+        selectedUsers.push(
+          new CollectionAccessSelectionView({
+            id: this.currentUserOrganizationUserId,
+            readOnly: false,
+            hidePasswords: false,
+            manage: true,
+          }),
+        );
       }
+
+      view.users = selectedUsers;
+      view.groups = this.groups
+        .map((g) => this.fromPreset(g.permission, g.id))
+        .filter((s): s is CollectionAccessSelectionView => s != null);
 
       if (this.editMode) {
         await this.collectionAdminService.update(view, userId);
       } else {
         await this.collectionAdminService.create(view, userId);
+      }
+
+      // Force a full sync so the sidebar's collection tree picks up the
+      // new/renamed collection reliably.
+      try {
+        await this.syncService.fullSync(true);
+      } catch {
+        /* non-fatal — local cache is already updated */
       }
 
       this.toastService.showToast({
@@ -287,17 +509,32 @@ export class CollectionAdminDialogComponent implements OnInit {
     if (!this.editMode || !this.data.collection?.id) {
       return;
     }
+    const name = this.existingAdminView?.name ?? this.data.collection.name;
+    const countMsg =
+      this.cipherCount > 0
+        ? ` This collection currently holds ${this.cipherCount} item${this.cipherCount === 1 ? "" : "s"} — they will stay in the organization and move to the root listing.`
+        : "";
     const confirmed = await this.dialogService.openSimpleDialog({
-      title: { key: "deleteCollection" },
-      content: { key: "deleteCollectionConfirmation" },
+      title: `Delete “${name}”?`,
+      content: `Are you sure you want to delete this collection?${countMsg}`,
       type: "warning",
+      acceptButtonText: "Delete",
+      cancelButtonText: "Cancel",
     });
     if (!confirmed) {
       return;
     }
     this.saving = true;
     try {
-      await this.collectionAdminService.delete(this.data.organizationId, this.data.collection.id);
+      await this.collectionAdminService.delete(
+        this.data.collection.organizationId!.toString(),
+        this.data.collection.id.toString(),
+      );
+      try {
+        await this.syncService.fullSync(true);
+      } catch {
+        /* non-fatal */
+      }
       this.toastService.showToast({
         variant: "success",
         title: null,

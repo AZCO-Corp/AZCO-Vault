@@ -21,10 +21,7 @@ import {
   VaultFilterServiceAbstraction,
 } from "@bitwarden/vault";
 
-import {
-  CollectionAdminDialogComponent,
-  CollectionAdminDialogResult,
-} from "../collection-admin-dialog/collection-admin-dialog.component";
+import { CollectionAdminDialogComponent } from "../collection-admin-dialog/collection-admin-dialog.component";
 
 import { CollectionFilterComponent } from "./collection-filter.component";
 
@@ -55,8 +52,12 @@ export class OrganizationFilterComponent {
   }
 
   // AZCO: true if the signed-in user can create/edit collections in this org.
+  // We gate on Admin/Owner role rather than canEditAnyCollection because that
+  // getter requires the org's allowAdminAccessToAllCollectionItems setting,
+  // which Vaultwarden returns as false by default.
   protected canEditCollections(org: TreeNode<OrganizationFilter>): boolean {
-    return !!(org?.node as any)?.canEditAnyCollection;
+    const node = org?.node as any;
+    return !!(node?.isAdmin || node?.isOwner || node?.canCreateNewCollections);
   }
 
   protected async newCollection(event: Event, org: TreeNode<OrganizationFilter>) {
@@ -64,29 +65,20 @@ export class OrganizationFilterComponent {
     const dialogRef = CollectionAdminDialogComponent.open(this.dialogService, {
       data: { organizationId: org.node.id },
     });
-    const result = (await firstValueFrom(dialogRef.closed)) as CollectionAdminDialogResult;
-    if (result === "saved") {
-      (this.vaultFilterService as any).reloadCollections?.();
-    }
+    await firstValueFrom(dialogRef.closed);
   }
 
   protected async editCollection(
-    event: Event,
     org: TreeNode<OrganizationFilter>,
     collection: TreeNode<CollectionFilter>,
   ) {
-    event.stopPropagation();
-    event.preventDefault();
     const dialogRef = CollectionAdminDialogComponent.open(this.dialogService, {
       data: {
         organizationId: org.node.id,
         collection: collection.node as any,
       },
     });
-    const result = (await firstValueFrom(dialogRef.closed)) as CollectionAdminDialogResult;
-    if (result === "saved" || result === "deleted") {
-      (this.vaultFilterService as any).reloadCollections?.();
-    }
+    await firstValueFrom(dialogRef.closed);
   }
 
   protected readonly show = computed(() => {

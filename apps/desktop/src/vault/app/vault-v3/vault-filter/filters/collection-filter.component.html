@@ -7,8 +7,25 @@
     [forceActiveStyles]="isActive()"
     [disableToggleOnClick]="true"
   >
+    @if (canEdit()) {
+      <button
+        slot="end"
+        type="button"
+        class="tw-bg-transparent tw-border-0 tw-cursor-pointer tw-text-inherit tw-px-1 tw-opacity-70 hover:tw-opacity-100"
+        [attr.aria-label]="'Edit ' + displayName()"
+        appA11yTitle="Edit collection"
+        (click)="onEditClick($event)"
+      >
+        <i class="bwi bwi-pencil bwi-sm" aria-hidden="true"></i>
+      </button>
+    }
     @for (childCollection of collection().children; track childCollection.node.id) {
-      <app-collection-filter [collection]="childCollection" [activeFilter]="activeFilter()" />
+      <app-collection-filter
+        [collection]="childCollection"
+        [activeFilter]="activeFilter()"
+        [canEdit]="canEdit()"
+        (editCollection)="editCollection.emit($event)"
+      />
     }
   </bit-nav-group>
 } @else {
@@ -18,5 +35,18 @@
     [text]="displayName()"
     [appA11yTitle]="displayName()"
     (click)="applyFilter($event)"
-  />
+  >
+    @if (canEdit()) {
+      <button
+        slot="end"
+        type="button"
+        class="tw-bg-transparent tw-border-0 tw-cursor-pointer tw-text-inherit tw-px-1 tw-opacity-70 hover:tw-opacity-100"
+        [attr.aria-label]="'Edit ' + displayName()"
+        appA11yTitle="Edit collection"
+        (click)="onEditClick($event)"
+      >
+        <i class="bwi bwi-pencil bwi-sm" aria-hidden="true"></i>
+      </button>
+    }
+  </bit-nav-item>
 }

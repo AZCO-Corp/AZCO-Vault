@@ -33,6 +33,8 @@ export class VaultItemsV2Component<C extends CipherViewLike> extends BaseVaultIt
   readonly showPremiumCallout = input<boolean>(false);
 
   readonly onAddFolder = output<void>();
+  // AZCO: fired when an admin picks "Collection" from the + menu.
+  readonly onAddCollection = output<void>();
 
   protected CipherViewLikeUtils = CipherViewLikeUtils;
 
