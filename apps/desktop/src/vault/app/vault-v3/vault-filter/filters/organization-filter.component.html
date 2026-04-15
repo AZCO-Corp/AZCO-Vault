@@ -19,7 +19,33 @@
         (click)="applyFilter($event, organization)"
       >
         @for (collection of collectionsForOrg(organization.node.id); track collection.node.id) {
-          <app-collection-filter [activeFilter]="activeFilter()" [collection]="collection" />
+          <bit-nav-item
+            icon="bwi-collection"
+            [text]="collection.node.name"
+            [appA11yTitle]="collection.node.name"
+            [forceActiveStyles]="collection.node.id === activeFilter()?.collectionId"
+          >
+            @if (canEditCollections(organization)) {
+              <button
+                slot="end"
+                type="button"
+                class="tw-bg-transparent tw-border-0 tw-cursor-pointer tw-text-muted hover:tw-text-main tw-px-1"
+                [attr.aria-label]="'Edit ' + collection.node.name"
+                appA11yTitle="Edit collection"
+                (click)="editCollection($event, organization, collection)"
+              >
+                <i class="bwi bwi-pencil bwi-sm" aria-hidden="true"></i>
+              </button>
+            }
+          </bit-nav-item>
+        }
+        @if (canEditCollections(organization)) {
+          <bit-nav-item
+            icon="bwi-plus"
+            text="New collection"
+            appA11yTitle="New collection"
+            (click)="newCollection($event, organization)"
+          />
         }
         @if (!organization.node.enabled) {
           <bit-icon

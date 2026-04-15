@@ -1,0 +1,90 @@
+<bit-dialog dialogSize="large" background="alt">
+  <span bitDialogTitle>
+    {{ editMode ? "Edit collection" : "New collection" }}
+    @if (orgName) {
+      <span class="tw-text-muted tw-font-normal tw-text-sm tw-ml-2">in {{ orgName }}</span>
+    }
+  </span>
+
+  <ng-container bitDialogContent>
+    <form [formGroup]="form" class="tw-flex tw-flex-col tw-gap-4">
+      <bit-form-field>
+        <bit-label>Name</bit-label>
+        <input
+          bitInput
+          type="text"
+          formControlName="name"
+          placeholder="e.g. Engineering, Engineering/Frontend"
+          autocomplete="off"
+        />
+        <bit-hint>
+          Use a forward slash in the name to nest (for example, "Engineering/Frontend").
+        </bit-hint>
+      </bit-form-field>
+
+      <div class="tw-mt-2">
+        <h3
+          class="tw-text-sm tw-font-semibold tw-text-muted tw-uppercase tw-tracking-wider tw-mb-2"
+        >
+          Members
+        </h3>
+
+        @if (loading) {
+          <p class="tw-text-muted tw-text-sm">Loading members…</p>
+        } @else if (members.length === 0) {
+          <p class="tw-text-muted tw-text-sm">No confirmed members in this organization.</p>
+        } @else {
+          <div
+            class="tw-border tw-border-secondary-300 tw-rounded-md tw-divide-y tw-divide-secondary-300 tw-max-h-80 tw-overflow-y-auto"
+          >
+            @for (member of members; track member.id) {
+              <div class="tw-flex tw-items-center tw-gap-3 tw-px-3 tw-py-2">
+                <div class="tw-flex-1 tw-min-w-0">
+                  <div class="tw-font-medium tw-text-sm tw-truncate">{{ member.name }}</div>
+                  <div class="tw-text-xs tw-text-muted tw-truncate">{{ member.email }}</div>
+                </div>
+                <select
+                  class="tw-border tw-border-secondary-300 tw-rounded tw-px-2 tw-py-1 tw-text-sm tw-bg-background tw-text-main"
+                  [(ngModel)]="member.permission"
+                  [ngModelOptions]="{ standalone: true }"
+                  [attr.aria-label]="'Permission for ' + member.name"
+                >
+                  @for (opt of permissionOptions; track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </form>
+  </ng-container>
+
+  <ng-container bitDialogFooter>
+    <button
+      type="button"
+      bitButton
+      buttonType="primary"
+      [disabled]="saving || loading"
+      (click)="save()"
+    >
+      {{ editMode ? "Save changes" : "Create collection" }}
+    </button>
+    <button type="button" bitButton buttonType="secondary" [disabled]="saving" (click)="cancel()">
+      Cancel
+    </button>
+    @if (editMode) {
+      <button
+        type="button"
+        bitButton
+        buttonType="danger"
+        class="tw-ml-auto"
+        [disabled]="saving"
+        (click)="deleteCollection()"
+      >
+        Delete
+      </button>
+    }
+  </ng-container>
+</bit-dialog>
