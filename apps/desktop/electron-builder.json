@@ -2,10 +2,10 @@
   "$schema": "https://raw.githubusercontent.com/electron-userland/electron-builder/master/packages/app-builder-lib/scheme.json",
 
   "extraMetadata": {
-    "name": "bitwarden"
+    "name": "azco-vault"
   },
-  "productName": "Bitwarden",
-  "appId": "com.bitwarden.desktop",
+  "productName": "AZCO Vault",
+  "appId": "com.azco.vault",
   "buildDependenciesFromSource": true,
   "copyright": "Copyright © 2015-2026 Bitwarden Inc.",
   "directories": {
@@ -13,7 +13,6 @@
     "output": "dist",
     "app": "build"
   },
-  "afterSign": "scripts/after-sign.js",
   "afterPack": "scripts/after-pack.js",
   "beforePack": "scripts/before-pack.js",
   "files": [
@@ -93,12 +92,7 @@
   },
   "win": {
     "electronUpdaterCompatibility": ">=0.0.1",
-    "target": ["portable", "nsis-web", "appx"],
-    "signExts": [".dll", ".node"],
-    "signtoolOptions": {
-      "sign": "./sign.js",
-      "publisherName": "Bitwarden Inc."
-    },
+    "target": ["nsis"],
     "extraFiles": [
       {
         "from": "desktop_native/dist/desktop_proxy.win32-${arch}.exe",
@@ -165,6 +159,16 @@
       "ElectronTeamID": "LTZ2PFU5D6"
     },
     "provisioningProfile": "bitwarden_desktop_appstore.provisionprofile"
+  },
+  "nsis": {
+    "oneClick": true,
+    "perMachine": true,
+    "allowToChangeInstallationDirectory": false,
+    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "uninstallDisplayName": "${productName}",
+    "deleteAppDataOnUninstall": false,
+    "shortcutName": "AZCO Vault",
+    "include": "installer.nsh"
   },
   "nsisWeb": {
     "oneClick": false,

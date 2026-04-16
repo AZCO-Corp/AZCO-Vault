@@ -5,7 +5,7 @@ import "core-js/proposals/explicit-resource-management";
 import * as path from "path";
 
 import { app } from "electron";
-import { Subject, firstValueFrom } from "rxjs";
+import { Subject, firstValueFrom, take } from "rxjs";
 
 import { SsoUrlService } from "@bitwarden/auth/common";
 import { AccountServiceImplementation } from "@bitwarden/common/auth/services/account.service";
@@ -13,7 +13,7 @@ import { DefaultActiveUserAccessor } from "@bitwarden/common/auth/services/defau
 import { ClientType } from "@bitwarden/common/enums";
 import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
 import { EncryptServiceImplementation } from "@bitwarden/common/key-management/crypto/services/encrypt.service.implementation";
-import { RegionConfig } from "@bitwarden/common/platform/abstractions/environment.service";
+import { Region, RegionConfig } from "@bitwarden/common/platform/abstractions/environment.service";
 import { SdkLoadService } from "@bitwarden/common/platform/abstractions/sdk/sdk-load.service";
 import { Message, MessageSender } from "@bitwarden/common/platform/messaging";
 // eslint-disable-next-line no-restricted-imports -- For dependency creation
@@ -205,6 +205,19 @@ export class Main {
       accountService,
       process.env.ADDITIONAL_REGIONS as unknown as RegionConfig[],
     );
+
+    // AZCO: on first launch (no environment configured yet), auto-set the
+    // server to Vaultwarden so users land on the login screen immediately
+    // instead of having to manually pick "Self-hosted" and type the URL.
+    void firstValueFrom(this.environmentService.globalEnvironment$.pipe(take(1))).then((env) => {
+      const currentBase = env?.getUrls()?.base;
+      if (!currentBase) {
+        return this.environmentService.setEnvironment(Region.SelfHosted, {
+          base: "https://vw.securusconverting.com",
+        });
+      }
+      return undefined;
+    });
 
     this.migrationRunner = new MigrationRunner(
       this.storageService,
