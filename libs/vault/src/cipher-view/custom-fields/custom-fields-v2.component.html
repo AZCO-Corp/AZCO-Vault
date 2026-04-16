@@ -1,11 +1,12 @@
-<section class="tw-mb-5 bit-compact:tw-mb-4">
+<!-- AZCO: hide section when only internal fields remain (e.g. __azco_icon) -->
+<section class="tw-mb-5 bit-compact:tw-mb-4" *ngIf="visibleFields.length > 0">
   <bit-section-header>
     <h2 bitTypography="h6">{{ "customFields" | i18n }}</h2>
   </bit-section-header>
   <bit-card>
     <div
       class="tw-border-secondary-300 [&_bit-form-field:last-of-type]:tw-mb-0"
-      *ngFor="let field of cipher.fields; let last = last; let i = index"
+      *ngFor="let field of visibleFields; let last = last; let i = index"
       [ngClass]="{ 'tw-mb-4': !last }"
       data-testid="custom-field"
     >

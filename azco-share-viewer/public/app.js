@@ -75,11 +75,26 @@ async function decryptEncString(encString, encKey, macKey) {
 
 // ─── parse shared body format produced by the desktop fork ─────────
 // Lines like "Label: value" followed by a blank line and then "Notes:\n<text>".
+// The desktop fork may prepend a single `Icon: data:image/...;base64,...`
+// header line (custom item icon). We strip it from the field list and
+// expose it on the parsed object so the renderer can show it above the card.
+const ICON_DATA_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/;
 function parseShareBody(text) {
   const fields = [];
   let notes = "";
+  let icon = null;
   const lines = text.split("\n");
   let i = 0;
+
+  // Optional Icon: <data url> header line. Must be the very first line.
+  if (lines.length > 0 && lines[0].startsWith("Icon: ")) {
+    const candidate = lines[0].slice("Icon: ".length).trim();
+    if (ICON_DATA_URL_RE.test(candidate)) {
+      icon = candidate;
+    }
+    i = 1;
+  }
+
   for (; i < lines.length; i++) {
     const line = lines[i];
     if (line === "") {
@@ -100,7 +115,7 @@ function parseShareBody(text) {
     // No Notes marker — remainder is free text.
     notes = lines.slice(i).join("\n").trimEnd();
   }
-  return { fields, notes };
+  return { icon, fields, notes };
 }
 
 // ─── TOTP (RFC 6238) ───────────────────────────────────────────────
@@ -335,7 +350,23 @@ function makeRow(label, value) {
   return row;
 }
 
-function renderContent({ fields, notes, expirationDate }) {
+function renderContent({ icon, fields, notes, expirationDate }) {
+  // AZCO custom item icon: render as the first child of the content card,
+  // ahead of the heading. Falls back to no icon when absent.
+  const card = document.getElementById("content");
+  const existingIcon = card.querySelector(".share-icon");
+  if (existingIcon) {
+    existingIcon.remove();
+  }
+  if (icon && ICON_DATA_URL_RE.test(icon)) {
+    const img = document.createElement("img");
+    img.className = "share-icon";
+    img.src = icon;
+    img.alt = "";
+    img.decoding = "async";
+    card.insertBefore(img, card.firstChild);
+  }
+
   const container = document.getElementById("fields");
   container.replaceChildren();
   for (const f of fields) {
@@ -427,8 +458,9 @@ async function main() {
     const urlKeyBytes = b64ToBytes(urlB64Key);
     const { encKey, macKey } = await deriveSendKey(urlKeyBytes);
     const plaintext = await decryptEncString(sendResp.text?.text, encKey, macKey);
-    const { fields, notes } = parseShareBody(plaintext);
+    const { icon, fields, notes } = parseShareBody(plaintext);
     renderContent({
+      icon,
       fields,
       notes,
       expirationDate: sendResp.expirationDate ?? sendResp.deletionDate,

@@ -13,8 +13,15 @@ import {
 
 import { DomainSettingsService } from "@bitwarden/common/autofill/services/domain-settings.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
+import { FieldType } from "@bitwarden/common/vault/enums";
 import { buildCipherIcon, CipherIconDetails } from "@bitwarden/common/vault/icon/build-cipher-icon";
 import { CipherViewLike } from "@bitwarden/common/vault/utils/cipher-view-like-utils";
+
+// AZCO: hidden custom-field name used to override the favicon on a per-item
+// basis. Must match AZCO_ICON_FIELD_NAME in
+// apps/desktop/src/vault/app/vault/azco-custom-icon.service.ts
+const AZCO_ICON_FIELD_NAME = "__azco_icon";
+const AZCO_ICON_DATA_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/;
 
 @Component({
   selector: "app-vault-icon",
@@ -43,6 +50,24 @@ export class IconComponent {
   readonly size = input<number>();
 
   readonly imageLoaded = signal(false);
+
+  // AZCO: when a cipher carries an `__azco_icon` hidden custom field, render
+  // that data URL in place of the favicon. No-op for ciphers without the
+  // field, so this is safe across web/browser/desktop.
+  protected readonly customIcon = computed<string | null>(() => {
+    const c = this.cipher() as unknown as {
+      fields?: Array<{ name?: string; value?: string; type?: number }>;
+    };
+    const fields = c?.fields;
+    if (!fields || fields.length === 0) {
+      return null;
+    }
+    const f = fields.find((x) => x?.name === AZCO_ICON_FIELD_NAME && x?.type === FieldType.Hidden);
+    if (!f?.value || !AZCO_ICON_DATA_URL_RE.test(f.value)) {
+      return null;
+    }
+    return f.value;
+  });
 
   /**
    * Computed style object for icon dimensions.

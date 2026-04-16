@@ -43,6 +43,7 @@ export * from "./abstractions/vault-items-transfer.service";
 export * from "./services/default-vault-items-transfer.service";
 export * from "./services/default-change-login-password.service";
 export * from "./services/archive-cipher-utilities.service";
+export { AzcoCustomIconService, AZCO_ICON_FIELD_NAME } from "./services/azco-custom-icon.service";
 
 export * from "./models/vault-filter.type";
 export * from "./models/vault-filter.model";

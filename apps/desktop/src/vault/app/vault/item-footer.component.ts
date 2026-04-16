@@ -31,7 +31,11 @@ import { CipherRepromptType, CipherType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { CipherAuthorizationService } from "@bitwarden/common/vault/services/cipher-authorization.service";
 import { ButtonComponent, ButtonModule, DialogService, ToastService } from "@bitwarden/components";
-import { ArchiveCipherUtilitiesService, PasswordRepromptService } from "@bitwarden/vault";
+import {
+  ArchiveCipherUtilitiesService,
+  AzcoCustomIconService,
+  PasswordRepromptService,
+} from "@bitwarden/vault";
 
 import {
   ShareLinkDialogComponent,
@@ -104,6 +108,7 @@ export class ItemFooterComponent implements OnInit, OnChanges {
     protected sendApiService: SendApiService,
     protected environmentService: EnvironmentService,
     protected platformUtilsService: PlatformUtilsService,
+    protected azcoCustomIconService: AzcoCustomIconService,
   ) {}
 
   async ngOnInit() {
@@ -210,7 +215,14 @@ export class ItemFooterComponent implements OnInit, OnChanges {
   }
 
   // AZCO: format an arbitrary cipher (login/card/identity/securenote/sshkey) as shareable text.
+  // If the cipher carries a custom icon (`__azco_icon` hidden field), it is
+  // prepended as a single `Icon: <data url>` header line so the share
+  // viewer can render it above the field table. The header is parsed and
+  // stripped before the rest of the body is laid out as rows.
   private buildShareBody(c: CipherView): string {
+    const customIcon = this.azcoCustomIconService.readCustomIcon(c);
+    const iconHeader = customIcon ? `Icon: ${customIcon}\n` : "";
+
     const rows: { label: string; value: string | undefined | null }[] = [];
     rows.push({ label: "Name", value: c.name });
 
@@ -275,7 +287,7 @@ export class ItemFooterComponent implements OnInit, OnChanges {
     if (c.notes) {
       lines.push("", "Notes:", c.notes);
     }
-    return lines.join("\n");
+    return iconHeader + lines.join("\n");
   }
 
   private formatExpiryLabel(hours: number): string {

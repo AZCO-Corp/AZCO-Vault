@@ -8,6 +8,7 @@ import { CipherType, FieldType, LinkedIdType } from "@bitwarden/common/vault/enu
 import { LinkedMetadata } from "@bitwarden/common/vault/linked-field-option.decorator";
 import { CardView } from "@bitwarden/common/vault/models/view/card.view";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
+import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { IdentityView } from "@bitwarden/common/vault/models/view/identity.view";
 import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 import {
@@ -22,6 +23,7 @@ import {
 } from "@bitwarden/components";
 
 import { VaultAutosizeReadOnlyTextArea } from "../../directives/readonly-textarea.directive";
+import { AZCO_ICON_FIELD_NAME } from "../../services/azco-custom-icon.service";
 
 // FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
@@ -62,15 +64,24 @@ export class CustomFieldV2Component implements OnInit, OnChanges {
     private eventCollectionService: EventCollectionService,
   ) {}
 
+  /** Fields visible to the user — excludes internal AZCO fields like `__azco_icon`. */
+  visibleFields: FieldView[] = [];
+
   ngOnInit(): void {
     this.fieldOptions = this.getLinkedFieldsOptionsForCipher();
+    this.updateVisibleFields();
   }
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes["cipher"]) {
       this.revealedHiddenFields = [];
       this.fieldOptions = this.getLinkedFieldsOptionsForCipher();
+      this.updateVisibleFields();
     }
+  }
+
+  private updateVisibleFields(): void {
+    this.visibleFields = (this.cipher?.fields ?? []).filter((f) => f.name !== AZCO_ICON_FIELD_NAME);
   }
 
   getLinkedType(linkedId: LinkedIdType) {
