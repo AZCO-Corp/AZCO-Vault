@@ -7,6 +7,8 @@ services:
       - "127.0.0.1:8330:8081"
     volumes:
       - icon-data:/data/icons
+    # Ensure the volume dir is writable by nginx worker (uid 101 in alpine).
+    entrypoint: ["/bin/sh", "-c", "chown -R nginx:nginx /data/icons && exec nginx -g 'daemon off;'"]
     environment:
       # Set this to a strong random token. AZCO Vault sends it as
       # Authorization: Bearer <token> when uploading/deleting icons.

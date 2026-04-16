@@ -7,7 +7,9 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY njs/ /etc/nginx/njs/
 
 # Icon storage directory — mount a volume here for persistence.
-RUN mkdir -p /data/icons
+# nginx workers run as the 'nginx' user (uid 101 in alpine), so the
+# directory must be writable by that user for njs fs.writeFileSync.
+RUN mkdir -p /data/icons && chown -R nginx:nginx /data/icons
 
 EXPOSE 8081
 

@@ -1939,11 +1939,15 @@ export class CipherService implements CipherServiceAbstraction {
       }
     }
     if (existingCipher.hasFields) {
+      // AZCO: exclude __azco_icon from password history — it's a per-cipher
+      // custom icon stored as a hidden field, not a secret.
+      const AZCO_ICON_FIELD = "__azco_icon";
       const existingHiddenFields = existingCipher.fields.filter(
         (f) =>
           f.type === FieldType.Hidden &&
           f.name != null &&
           f.name !== "" &&
+          f.name !== AZCO_ICON_FIELD &&
           f.value != null &&
           f.value !== "",
       );

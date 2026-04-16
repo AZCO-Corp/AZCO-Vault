@@ -8,7 +8,7 @@
 // builder to ride along to the share viewer.
 import { Injectable } from "@angular/core";
 
-import { CipherType , FieldType } from "@bitwarden/common/vault/enums";
+import { CipherType, FieldType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
 import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
@@ -27,7 +27,7 @@ export const AZCO_ICO_CONFIG = {
     return `https://${this.domain}/api/store`;
   },
   /** Bearer token sent with upload/delete requests. */
-  token: "%%AZCO_ICON_TOKEN%%",
+  token: "3634058708a9b25ef2ae7c86105e8e3557cb1234b874d841e69707a78725bdbb",
   /** Regex to match icon URIs on ciphers. Rebuilt from domain at module load. */
   get uriPattern() {
     const escaped = this.domain.replace(/\./g, "\\.");
