@@ -1,0 +1,16 @@
+services:
+  azco-icon-server:
+    build: .
+    container_name: azco-icon-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8330:8081"
+    volumes:
+      - icon-data:/data/icons
+    environment:
+      # Set this to a strong random token. AZCO Vault sends it as
+      # Authorization: Bearer <token> when uploading/deleting icons.
+      - AZCO_ICON_TOKEN=${AZCO_ICON_TOKEN:?Set AZCO_ICON_TOKEN in .env}
+
+volumes:
+  icon-data:

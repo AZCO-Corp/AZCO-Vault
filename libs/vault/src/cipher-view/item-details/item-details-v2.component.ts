@@ -229,6 +229,13 @@ export class ItemDetailsV2Component {
       const dataUrl = await this.azcoCustomIconService.resizeImageToDataUrl(file);
       const cipher = this.cipher();
       this.azcoCustomIconService.writeCustomIcon(cipher, dataUrl);
+      // Upload to icon server + insert favicon URI (best-effort — icon
+      // still works in AZCO Vault via the hidden field even if this fails).
+      try {
+        await this.azcoCustomIconService.syncIconToServer(cipher, dataUrl);
+      } catch (e) {
+        this.azcoLogService.info("Icon server sync failed (non-fatal): " + (e as Error)?.message);
+      }
       await this.azcoSaveCipher(cipher);
       this.azcoIconUrl.set(dataUrl);
       this.azcoToastService.showToast({
@@ -257,6 +264,14 @@ export class ItemDetailsV2Component {
     try {
       const cipher = this.cipher();
       this.azcoCustomIconService.writeCustomIcon(cipher, null);
+      // Remove icon from server + strip favicon URI (best-effort).
+      try {
+        await this.azcoCustomIconService.removeIconFromServer(cipher);
+      } catch (e) {
+        this.azcoLogService.info(
+          "Icon server removal failed (non-fatal): " + (e as Error)?.message,
+        );
+      }
       await this.azcoSaveCipher(cipher);
       this.azcoIconUrl.set(null);
       this.azcoToastService.showToast({

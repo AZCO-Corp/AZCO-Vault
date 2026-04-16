@@ -8,11 +8,32 @@
 // builder to ride along to the share viewer.
 import { Injectable } from "@angular/core";
 
-import { FieldType } from "@bitwarden/common/vault/enums";
+import { CipherType , FieldType } from "@bitwarden/common/vault/enums";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import { FieldView } from "@bitwarden/common/vault/models/view/field.view";
+import { LoginUriView } from "@bitwarden/common/vault/models/view/login-uri.view";
+import { LoginView } from "@bitwarden/common/vault/models/view/login.view";
 
 export const AZCO_ICON_FIELD_NAME = "__azco_icon";
+
+// ─── Icon server config ──────────────────────────────────────────
+// Change these to point at a different icon server deployment.
+// The wildcard DNS pattern is: {hash}.<AZCO_ICO_DOMAIN>
+export const AZCO_ICO_CONFIG = {
+  /** Base domain. Wildcard DNS routes {hash}.<domain> to the icon server. */
+  domain: "ico.securusconverting.com",
+  /** Upload/delete API base URL (bare domain, not a wildcard subdomain). */
+  get apiBase() {
+    return `https://${this.domain}/api/store`;
+  },
+  /** Bearer token sent with upload/delete requests. */
+  token: "%%AZCO_ICON_TOKEN%%",
+  /** Regex to match icon URIs on ciphers. Rebuilt from domain at module load. */
+  get uriPattern() {
+    const escaped = this.domain.replace(/\./g, "\\.");
+    return new RegExp(`^https?://([a-f0-9]{12})\\.${escaped}/?$`, "i");
+  },
+};
 
 const DATA_URL_RE = /^data:image\/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+$/;
 
@@ -60,6 +81,87 @@ export class AzcoCustomIconService {
     field.value = dataUrl;
     field.type = FieldType.Hidden;
     cipher.fields.push(field);
+  }
+
+  // ─── Icon server integration ─────────────────────────────────────
+  // Uploads the icon to the icon server and inserts a `{hash}.ico.securusconverting.com`
+  // URI on the cipher so official BW clients render it as a favicon.
+  // Only applies to Login-type ciphers (other types don't have URIs).
+  async syncIconToServer(cipher: CipherView, dataUrl: string): Promise<void> {
+    const bytes = dataUrlToBytes(dataUrl);
+    const hash = await hashIcon(bytes);
+
+    // Upload to icon server
+    const resp = await fetch(`${AZCO_ICO_CONFIG.apiBase}/${hash}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${AZCO_ICO_CONFIG.token}`,
+        "Content-Type": "application/octet-stream",
+      },
+      body: bytes.buffer as ArrayBuffer,
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`Icon server upload failed (${resp.status}): ${text}`);
+    }
+
+    // Add the icon URI as the first URI (only for logins).
+    if (cipher.type === CipherType.Login) {
+      this.upsertIconUri(cipher, hash);
+    }
+  }
+
+  async removeIconFromServer(cipher: CipherView): Promise<void> {
+    const existingHash = this.findIconUriHash(cipher);
+    if (existingHash) {
+      // Best-effort delete — don't fail the remove if the server is down.
+      await fetch(`${AZCO_ICO_CONFIG.apiBase}/${existingHash}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${AZCO_ICO_CONFIG.token}` },
+      }).catch(() => {});
+    }
+    this.removeIconUri(cipher);
+  }
+
+  // Find the existing ico.securusconverting.com URI hash on the cipher, if any.
+  findIconUriHash(cipher: CipherView): string | null {
+    if (cipher.type !== CipherType.Login || !cipher.login?.uris) {
+      return null;
+    }
+    for (const u of cipher.login.uris) {
+      const m = AZCO_ICO_CONFIG.uriPattern.exec(u.uri ?? "");
+      if (m) {
+        return m[1];
+      }
+    }
+    return null;
+  }
+
+  private upsertIconUri(cipher: CipherView, hash: string): void {
+    if (!cipher.login) {
+      cipher.login = new LoginView();
+    }
+    if (!cipher.login.uris) {
+      cipher.login.uris = [];
+    }
+    const iconUrl = `https://${hash}.${AZCO_ICO_CONFIG.domain}`;
+    // Remove any existing icon URI.
+    cipher.login.uris = cipher.login.uris.filter(
+      (u) => !AZCO_ICO_CONFIG.uriPattern.test(u.uri ?? ""),
+    );
+    // Insert as first URI so BW resolves its favicon.
+    const uriView = new LoginUriView();
+    uriView.uri = iconUrl;
+    cipher.login.uris.unshift(uriView);
+  }
+
+  private removeIconUri(cipher: CipherView): void {
+    if (cipher.type !== CipherType.Login || !cipher.login?.uris) {
+      return;
+    }
+    cipher.login.uris = cipher.login.uris.filter(
+      (u) => !AZCO_ICO_CONFIG.uriPattern.test(u.uri ?? ""),
+    );
   }
 
   // Resize an arbitrary user-supplied image to a square JPEG data URL.
@@ -129,4 +231,30 @@ function fitInside(w: number, h: number, max: number): { width: number; height: 
     width: Math.max(1, Math.round(w * ratio)),
     height: Math.max(1, Math.round(h * ratio)),
   };
+}
+
+// Decode a data URL to raw bytes.
+function dataUrlToBytes(dataUrl: string): Uint8Array {
+  const comma = dataUrl.indexOf(",");
+  if (comma < 0) {
+    throw new Error("Invalid data URL");
+  }
+  const b64 = dataUrl.slice(comma + 1);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    bytes[i] = bin.charCodeAt(i);
+  }
+  return bytes;
+}
+
+// SHA-256 hash of the image bytes → first 12 hex chars.
+async function hashIcon(bytes: Uint8Array): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", bytes.buffer as ArrayBuffer);
+  const arr = new Uint8Array(digest);
+  let hex = "";
+  for (const b of arr) {
+    hex += b.toString(16).padStart(2, "0");
+  }
+  return hex.slice(0, 12);
 }
