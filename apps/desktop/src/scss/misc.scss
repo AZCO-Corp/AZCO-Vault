@@ -515,3 +515,95 @@ app-vault-icon img.azco-custom-icon {
   border-radius: 6px;
   object-fit: cover;
 }
+
+/* AZCO: "Who has access" popover styles. */
+.azco-access-btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--color-secondary-300, #d2d6e0);
+  border-radius: 8px;
+  padding: 5px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--color-text-main, #1f2937);
+  display: inline-flex;
+  align-items: center;
+  transition:
+    background-color 0.12s,
+    border-color 0.12s;
+}
+.azco-access-btn:hover {
+  background: var(--color-primary-100, #dce8fb);
+  border-color: var(--color-primary-500, #175ddc);
+  color: var(--color-primary-500, #175ddc);
+}
+
+.azco-access-popover {
+  min-width: 280px;
+  max-width: 380px;
+  max-height: 400px;
+  overflow-y: auto;
+}
+.azco-access-collection-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted, #6b7280);
+  padding: 8px 0 4px;
+  border-bottom: 1px solid var(--color-secondary-300, #e5e7eb);
+  margin-bottom: 4px;
+}
+.azco-access-collection-name:not(:first-child) {
+  margin-top: 12px;
+}
+
+.azco-access-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  gap: 8px;
+}
+.azco-access-row + .azco-access-row {
+  border-top: 1px solid var(--color-secondary-100, #f1f3f5);
+}
+.azco-access-row-info {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+}
+.azco-access-row-info i {
+  flex-shrink: 0;
+  color: var(--color-text-muted, #6b7280);
+  font-size: 12px;
+}
+.azco-access-row-name {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.azco-access-row-perm {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 10px;
+  letter-spacing: 0.02em;
+}
+.azco-perm-manage {
+  background: var(--color-primary-100, #dce8fb);
+  color: var(--color-primary-700, #0f3fa8);
+}
+.azco-perm-edit {
+  background: #dcfce7;
+  color: #166534;
+}
+.azco-perm-view {
+  background: #fef3c7;
+  color: #92400e;
+}

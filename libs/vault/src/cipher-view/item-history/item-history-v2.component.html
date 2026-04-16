@@ -11,7 +11,8 @@
       class="tw-text-xs tw-text-muted tw-select-all"
       [ngClass]="{
         'tw-mb-1 ': cipher.hasPasswordHistory,
-        'tw-mb-0': !cipher.hasPasswordHistory,
+        'tw-mb-0': !cipher.hasPasswordHistory && !azcoShowAccessButton,
+        'tw-mb-3': !cipher.hasPasswordHistory && azcoShowAccessButton,
       }"
     >
       <span class="tw-font-medium">{{ "dateCreated" | i18n }}:</span>
@@ -20,19 +21,86 @@
     <p
       *ngIf="cipher.passwordRevisionDisplayDate"
       class="tw-text-xs tw-text-muted tw-select-all"
-      [ngClass]="{ 'tw-mb-3': cipher.hasPasswordHistory }"
+      [ngClass]="{ 'tw-mb-3': cipher.hasPasswordHistory || azcoShowAccessButton }"
     >
       <span class="tw-font-medium">{{ "datePasswordUpdated" | i18n }}:</span>
       {{ cipher.passwordRevisionDisplayDate | date: "medium" }}
     </p>
-    <button
-      *ngIf="cipher.hasPasswordHistory"
-      (click)="viewPasswordHistory()"
-      bitTypography="body2"
-      bitLink
-      type="button"
-    >
-      {{ "passwordHistory" | i18n }}
-    </button>
+    <div class="tw-flex tw-flex-wrap tw-gap-2">
+      <button
+        *ngIf="cipher.hasPasswordHistory"
+        (click)="viewPasswordHistory()"
+        bitTypography="body2"
+        bitLink
+        type="button"
+      >
+        {{ "passwordHistory" | i18n }}
+      </button>
+
+      <!-- AZCO: "Who has access" popover -->
+      <button
+        *ngIf="azcoShowAccessButton"
+        type="button"
+        class="azco-access-btn"
+        [bitPopoverTriggerFor]="azcoAccessPopover"
+        (click)="azcoLoadAccess()"
+        aria-label="Who has access"
+      >
+        <i class="bwi bwi-users tw-mr-1.5" aria-hidden="true"></i>
+        <span>Who has access</span>
+      </button>
+
+      <bit-popover #azcoAccessPopover>
+        <div class="azco-access-popover">
+          @if (azcoAccessLoading()) {
+            <p class="tw-text-muted tw-text-sm tw-m-0 tw-py-2">Loading access details…</p>
+          } @else if (azcoAccessError()) {
+            <p class="tw-text-danger tw-text-sm tw-m-0 tw-py-2">{{ azcoAccessError() }}</p>
+          } @else {
+            @for (col of azcoAccessData(); track col.collectionName) {
+              @if (azcoAccessData().length > 1) {
+                <div class="azco-access-collection-name">
+                  <i class="bwi bwi-collection-shared tw-mr-1" aria-hidden="true"></i>
+                  {{ col.collectionName }}
+                </div>
+              }
+              @if (col.members.length === 0) {
+                <p class="tw-text-muted tw-text-xs tw-m-0 tw-py-1">No members assigned</p>
+              } @else {
+                @for (entry of col.members; track entry.name + entry.type) {
+                  <div class="azco-access-row">
+                    <div class="azco-access-row-info">
+                      <i
+                        class="bwi tw-mr-1.5"
+                        [ngClass]="entry.type === 'group' ? 'bwi-users' : 'bwi-user'"
+                        aria-hidden="true"
+                      ></i>
+                      <span class="azco-access-row-name" [title]="entry.email || entry.name">
+                        {{ entry.name }}
+                      </span>
+                    </div>
+                    <span
+                      class="azco-access-row-perm"
+                      [ngClass]="{
+                        'azco-perm-manage': entry.permission === 'Manage',
+                        'azco-perm-edit':
+                          entry.permission === 'Edit' || entry.permission === 'Edit (hidden)',
+                        'azco-perm-view':
+                          entry.permission === 'View' || entry.permission === 'View (hidden)',
+                      }"
+                    >
+                      {{ entry.permission }}
+                    </span>
+                  </div>
+                }
+              }
+            }
+            @if (azcoAccessData().length === 0 && !azcoAccessLoading()) {
+              <p class="tw-text-muted tw-text-sm tw-m-0 tw-py-2">No access details available</p>
+            }
+          }
+        </div>
+      </bit-popover>
+    </div>
   </bit-card>
 </bit-section>
