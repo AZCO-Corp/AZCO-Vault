@@ -26,7 +26,7 @@
   "generateUpdatesFilesForAllChannels": true,
   "publish": {
     "provider": "generic",
-    "url": "https://artifacts.bitwarden.com/desktop"
+    "url": "http://vault-updates.azco.local"
   },
   "mac": {
     "electronUpdaterCompatibility": ">=0.0.1",

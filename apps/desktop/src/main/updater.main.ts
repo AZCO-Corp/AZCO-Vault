@@ -14,8 +14,6 @@ import { WindowMain } from "./window.main";
 const UpdaterCheckInitialDelay = 5 * 1000; // 5 seconds
 const UpdaterCheckInterval = 12 * 60 * 60 * 1000; // 12 hours
 
-const MaxTimeBeforeBlockingUpdateNotification = 7 * 24 * 60 * 60 * 1000; // 7 days
-
 export class UpdaterMain {
   private doingUpdateCheck = false;
   private doingUpdateCheckWithFeedback = false;
@@ -168,23 +166,9 @@ export class UpdaterMain {
     this.updateDownloaded = null;
   }
 
-  private async promptRestartUpdate(info: UpdateDownloadedEvent, blocking: boolean) {
-    // If we have an initial notification, and it's from a long time ago,
-    // we will block the user with a dialog to ensure they see it.
-    const longTimeSinceInitialNotification =
-      this.initialUpdateNotificationTime != null &&
-      Date.now() - this.initialUpdateNotificationTime > MaxTimeBeforeBlockingUpdateNotification;
-
-    if (!longTimeSinceInitialNotification && !blocking && Notification.isSupported()) {
-      // If the prompt doesn't have to block and we support notifications,
-      // we will show a notification instead of a blocking dialog, which won't steal focus.
-      await this.promptRestartUpdateUsingSystemNotification(info);
-    } else {
-      // If we are blocking, or notifications are not supported, we will show a blocking dialog.
-      // This will steal the user's focus, so we should only do this for user initiated actions
-      // or when there are no other options.
-      await this.promptRestartUpdateUsingDialog(info);
-    }
+  private async promptRestartUpdate(info: UpdateDownloadedEvent, _blocking: boolean) {
+    // AZCO: always use blocking dialog — org-managed app, updates are mandatory.
+    await this.promptRestartUpdateUsingDialog(info);
   }
 
   private async promptRestartUpdateUsingSystemNotification(info: UpdateDownloadedEvent) {
@@ -212,29 +196,42 @@ export class UpdaterMain {
   }
 
   private async promptRestartUpdateUsingDialog(info: UpdateDownloadedEvent) {
-    const result = await dialog.showMessageBox(this.windowMain.win, {
+    // AZCO: mandatory update — only "Update & Restart" button, no dismiss.
+    // The dialog blocks until the user clicks.
+    await dialog.showMessageBox(this.windowMain.win, {
       type: "info",
-      title: this.i18nService.t("bitwarden") + " - " + this.i18nService.t("restartToUpdate"),
-      message: this.i18nService.t("restartToUpdate"),
-      detail: this.i18nService.t("restartToUpdateDesc", info.version),
-      buttons: [this.i18nService.t("restart"), this.i18nService.t("later")],
-      cancelId: 1,
+      title: "AZCO Vault — Update Required",
+      message: `Version ${info.version} is ready to install.`,
+      detail:
+        "A required update has been downloaded. The app will close and reopen automatically.\n\nInstallation takes about a minute.",
+      buttons: ["Update & Restart"],
       defaultId: 0,
       noLink: true,
     });
 
-    if (result.response === 0) {
-      if (!(await this.confirmUpdateRestart())) {
-        this.reset();
-        return;
-      }
-
-      // Quit and install have a different window logic, setting `isQuitting` just to be safe.
-      this.windowMain.isQuitting = true;
-      autoUpdater.quitAndInstall(true, true);
-    } else {
+    if (!(await this.confirmUpdateRestart())) {
       this.reset();
+      return;
     }
+
+    // AZCO: show a persistent system notification so the user has visual
+    // feedback during the silent NSIS install (oneClick suppresses the
+    // installer UI, so without this the Start Menu shortcut would appear
+    // broken for 1-2 minutes while files are replaced).
+    try {
+      const installingNotif = new Notification({
+        title: "AZCO Vault — Updating",
+        body: `Installing version ${info.version}. The app will reopen automatically in about a minute.`,
+        timeoutType: "never",
+        silent: false,
+      });
+      installingNotif.show();
+    } catch {
+      // Notifications not available — fall through.
+    }
+
+    this.windowMain.isQuitting = true;
+    autoUpdater.quitAndInstall(true, true);
   }
 
   /**
