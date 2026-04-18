@@ -8,3 +8,55 @@
 
 @import "./vault-filters";
 @import "./plugins.scss";
+
+/* AZCO: per-cipher custom icon affordances on the cipher edit form. */
+.azco-icon-slot {
+  position: relative;
+  border-radius: 8px;
+}
+.azco-icon-slot.azco-icon-editable {
+  cursor: pointer;
+  outline: 1px dashed transparent;
+  transition:
+    outline-color 0.12s,
+    background-color 0.12s;
+}
+.azco-icon-slot.azco-icon-editable:hover,
+.azco-icon-slot.azco-icon-editable:focus-visible {
+  outline-color: var(--color-primary-500, #175ddc);
+  background-color: rgba(23, 93, 220, 0.06);
+}
+.azco-icon-slot.azco-icon-busy {
+  cursor: progress;
+  opacity: 0.6;
+}
+.azco-icon-slot .azco-icon-remove {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  display: none;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border-main, #ccc);
+  background: var(--color-background-alt, #fff);
+  color: var(--color-text-muted, #666);
+  font-size: 12px;
+  line-height: 1;
+  padding: 0;
+  cursor: pointer;
+}
+.azco-icon-slot:hover .azco-icon-remove,
+.azco-icon-slot:focus-within .azco-icon-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.azco-icon-slot .azco-icon-remove:hover {
+  background: var(--color-danger-500, #c83532);
+  color: #fff;
+}
+app-vault-icon img.azco-custom-icon {
+  border-radius: 6px;
+  object-fit: cover;
+}

@@ -1,7 +1,18 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { CommonModule } from "@angular/common";
-import { Component, computed, DestroyRef, input, Input, OnInit } from "@angular/core";
+import {
+  Component,
+  computed,
+  DestroyRef,
+  ElementRef,
+  inject,
+  input,
+  Input,
+  OnInit,
+  signal,
+  viewChild,
+} from "@angular/core";
 import { takeUntilDestroyed } from "@angular/core/rxjs-interop";
 import { FormBuilder, FormControl, ReactiveFormsModule, Validators } from "@angular/forms";
 import { concatMap, distinctUntilChanged, firstValueFrom, map } from "rxjs";
@@ -18,6 +29,7 @@ import { Organization } from "@bitwarden/common/admin-console/models/domain/orga
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
 import { CollectionId, OrganizationId, UserId } from "@bitwarden/common/types/guid";
@@ -30,9 +42,11 @@ import {
   SectionHeaderComponent,
   SelectItemView,
   SelectModule,
+  ToastService,
   TypographyModule,
 } from "@bitwarden/components";
 
+import { AzcoCustomIconService } from "../../../services/azco-custom-icon.service";
 import {
   CipherFormConfig,
   OptionalInitialValues,
@@ -183,6 +197,101 @@ export class ItemDetailsSectionComponent implements OnInit {
     this.itemDetailsForm.controls.favorite.setValue(!this.itemDetailsForm.controls.favorite.value);
   }
 
+  // ─── AZCO: per-cipher custom icon (click to upload in edit form) ───
+  readonly azcoIconFileInput = viewChild<ElementRef<HTMLInputElement>>("azcoIconFileInput");
+  protected readonly azcoIconBusy = signal(false);
+  protected readonly azcoIconUrl = signal<string | null>(null);
+
+  private readonly azcoCustomIconService = inject(AzcoCustomIconService);
+  private readonly azcoToastService = inject(ToastService);
+  private readonly azcoLogService = inject(LogService);
+
+  protected readonly azcoHasCustomIcon = computed(() => this.azcoIconUrl() != null);
+
+  protected readonly azcoCanEditIcon = computed(() => {
+    return this.config?.mode === "edit" || this.config?.mode === "add";
+  });
+
+  protected azcoInitIcon(): void {
+    const cipher = this.cipherFormContainer.getInitialCipherView();
+    this.azcoIconUrl.set(this.azcoCustomIconService.readCustomIcon(cipher));
+  }
+
+  protected onAzcoIconClick(): void {
+    if (!this.azcoCanEditIcon() || this.azcoIconBusy()) {
+      return;
+    }
+    this.azcoIconFileInput()?.nativeElement.click();
+  }
+
+  protected async onAzcoIconFileSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) {
+      return;
+    }
+    if (!file.type.startsWith("image/")) {
+      this.azcoToastService.showToast({
+        variant: "error",
+        title: null,
+        message: "Custom icon must be an image file.",
+      });
+      return;
+    }
+    const MAX_INPUT_BYTES = 2 * 1024 * 1024;
+    if (file.size > MAX_INPUT_BYTES) {
+      this.azcoToastService.showToast({
+        variant: "error",
+        title: null,
+        message: "Custom icon image is too large (2 MB max).",
+      });
+      return;
+    }
+
+    this.azcoIconBusy.set(true);
+    try {
+      const dataUrl = await this.azcoCustomIconService.resizeImageToDataUrl(file);
+      // Patch the cipher form's updatedCipherView with the icon field
+      this.cipherFormContainer.patchCipher((cipher) => {
+        this.azcoCustomIconService.writeCustomIcon(cipher, dataUrl);
+        return cipher;
+      });
+      this.azcoIconUrl.set(dataUrl);
+      this.azcoToastService.showToast({
+        variant: "success",
+        title: null,
+        message: "Icon set — save to apply.",
+      });
+    } catch (e) {
+      this.azcoLogService.error(e);
+      this.azcoToastService.showToast({
+        variant: "error",
+        title: null,
+        message: `Could not set icon: ${(e as Error)?.message ?? "unknown error"}`,
+      });
+    } finally {
+      this.azcoIconBusy.set(false);
+    }
+  }
+
+  protected onAzcoIconRemove(event: Event): void {
+    event.stopPropagation();
+    if (!this.azcoCanEditIcon() || this.azcoIconBusy()) {
+      return;
+    }
+    this.cipherFormContainer.patchCipher((cipher) => {
+      this.azcoCustomIconService.writeCustomIcon(cipher, null);
+      return cipher;
+    });
+    this.azcoIconUrl.set(null);
+    this.azcoToastService.showToast({
+      variant: "success",
+      title: null,
+      message: "Icon removed — save to apply.",
+    });
+  }
+
   get allowOwnershipChange() {
     // Do not allow ownership change in edit mode and the cipher is owned by an organization
     if (this.config.mode === "edit" && this.originalCipherView()?.organizationId != null) {
@@ -224,6 +333,9 @@ export class ItemDetailsSectionComponent implements OnInit {
     }
 
     const prefillCipher = this.cipherFormContainer.getInitialCipherView();
+
+    // AZCO: initialize icon URL from existing cipher
+    this.azcoInitIcon();
 
     if (prefillCipher) {
       await this.initFromExistingCipher(prefillCipher);

@@ -18,6 +18,55 @@
     ></button>
   </bit-section-header>
   <bit-card>
+    <!-- AZCO: custom icon upload — click to pick image, hover × to remove -->
+    @if (azcoCanEditIcon()) {
+      <div class="tw-flex tw-items-center tw-gap-3 tw-mb-3">
+        <div
+          class="tw-relative tw-flex tw-items-center tw-justify-center tw-flex-shrink-0 azco-icon-slot azco-icon-editable"
+          [class.azco-icon-busy]="azcoIconBusy()"
+          (click)="onAzcoIconClick()"
+          role="button"
+          tabindex="0"
+          [attr.aria-label]="azcoHasCustomIcon() ? 'Change custom icon' : 'Add custom icon'"
+          [attr.title]="azcoHasCustomIcon() ? 'Change icon (click)' : 'Add custom icon (click)'"
+          (keydown.enter)="onAzcoIconClick()"
+          (keydown.space)="onAzcoIconClick()"
+          style="width: 40px; height: 40px"
+        >
+          @if (azcoIconUrl(); as iconUrl) {
+            <img
+              [src]="iconUrl"
+              class="tw-rounded-md tw-object-cover azco-custom-icon"
+              alt=""
+              style="width: 36px; height: 36px"
+            />
+          } @else {
+            <i class="bwi bwi-image bwi-lg tw-text-muted" aria-hidden="true"></i>
+          }
+          @if (azcoHasCustomIcon()) {
+            <button
+              type="button"
+              class="azco-icon-remove"
+              aria-label="Remove custom icon"
+              title="Remove custom icon"
+              (click)="onAzcoIconRemove($event)"
+            >
+              ×
+            </button>
+          }
+          <input
+            #azcoIconFileInput
+            type="file"
+            accept="image/*"
+            class="tw-hidden"
+            (change)="onAzcoIconFileSelected($event)"
+          />
+        </div>
+        <span class="tw-text-muted tw-text-sm">
+          {{ azcoHasCustomIcon() ? "Click to change icon" : "Click to add icon" }}
+        </span>
+      </div>
+    }
     <bit-form-field>
       <bit-label>{{ "itemName" | i18n }}</bit-label>
       <input bitInput formControlName="name" />
