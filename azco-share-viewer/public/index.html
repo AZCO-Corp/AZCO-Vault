@@ -4,39 +4,68 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="referrer" content="no-referrer" />
-    <title>Shared with you &middot; AZCO</title>
-    <link rel="icon" type="image/svg+xml" href="/logo-blue.svg?v=4" />
-    <link rel="stylesheet" href="/styles.css?v=4" />
+    <title>AZCO</title>
   </head>
   <body>
-    <main id="app">
-      <a class="brand" href="https://azcocorp.com" aria-label="AZCO">
-        <img src="/logo-blue.svg?v=4" alt="AZCO" width="160" height="42" />
-      </a>
+    <script>
+      // Only load the share viewer when the URL contains a valid fragment.
+      // Fragment format: #/<accessId>/<urlB64Key>
+      // No fragment → redirect to main site. Submarines the domain.
+      (function () {
+        var h = window.location.hash || "";
+        if (/^#\/[A-Za-z0-9_-]+\/[A-Za-z0-9_-]+/.test(h)) {
+          // Valid share link — load the viewer
+          var head = document.head;
 
-      <section id="loading" class="card" aria-live="polite">
-        <div class="spinner" aria-hidden="true"></div>
-        <p class="meta">Decrypting share&hellip;</p>
-      </section>
+          var icon = document.createElement("link");
+          icon.rel = "icon";
+          icon.type = "image/svg+xml";
+          icon.href = "/logo-blue.svg?v=5";
+          head.appendChild(icon);
 
-      <section id="error" class="card hidden" aria-live="polite">
-        <h1>Share unavailable</h1>
-        <p id="error-message">This link is invalid, has expired, or has already been viewed.</p>
-      </section>
+          var css = document.createElement("link");
+          css.rel = "stylesheet";
+          css.href = "/styles.css?v=5";
+          head.appendChild(css);
 
-      <section id="content" class="card hidden">
-        <header>
-          <h1>Someone shared an item with you.</h1>
-          <p class="meta" id="expiry"></p>
-        </header>
-        <div id="fields"></div>
-        <footer>
-          <p class="fine-print">
-            Fields above are end-to-end encrypted. The decryption key never leaves your browser.
-          </p>
-        </footer>
-      </section>
-    </main>
-    <script type="module" src="/app.js?v=4"></script>
+          document.title = "Shared with you \u00b7 AZCO";
+
+          document.body.innerHTML =
+            '<main id="app">' +
+            '<a class="brand" href="https://azcocorp.com" aria-label="AZCO">' +
+            '<img src="/logo-blue.svg?v=5" alt="AZCO" width="160" height="42" />' +
+            "</a>" +
+            '<section id="loading" class="card" aria-live="polite">' +
+            '<div class="spinner" aria-hidden="true"></div>' +
+            '<p class="meta">Decrypting share&hellip;</p>' +
+            "</section>" +
+            '<section id="error" class="card hidden" aria-live="polite">' +
+            "<h1>Share unavailable</h1>" +
+            '<p id="error-message">This link is invalid, has expired, or has already been viewed.</p>' +
+            "</section>" +
+            '<section id="content" class="card hidden">' +
+            "<header>" +
+            "<h1>Someone shared an item with you.</h1>" +
+            '<p class="meta" id="expiry"></p>' +
+            "</header>" +
+            '<div id="fields"></div>' +
+            "<footer>" +
+            '<p class="fine-print">' +
+            "Fields above are end-to-end encrypted. The decryption key never leaves your browser." +
+            "</p>" +
+            "</footer>" +
+            "</section>" +
+            "</main>";
+
+          var js = document.createElement("script");
+          js.type = "module";
+          js.src = "/app.js?v=5";
+          document.body.appendChild(js);
+        } else {
+          // No valid fragment — redirect away
+          window.location.replace("https://azcocorp.com");
+        }
+      })();
+    </script>
   </body>
 </html>
