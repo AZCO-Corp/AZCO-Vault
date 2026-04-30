@@ -213,7 +213,7 @@ export class Main {
       const currentBase = env?.getUrls()?.base;
       if (!currentBase) {
         return this.environmentService.setEnvironment(Region.SelfHosted, {
-          base: "https://vw.securusconverting.com",
+          base: "https://vw.azco.local",
         });
       }
       return undefined;

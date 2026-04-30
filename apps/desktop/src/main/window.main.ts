@@ -4,7 +4,7 @@ import { once } from "node:events";
 import * as path from "path";
 import * as url from "url";
 
-import { app, BrowserWindow, ipcMain, nativeTheme, screen, session } from "electron";
+import { app, BrowserWindow, ipcMain, Menu, nativeTheme, screen, session } from "electron";
 import { concatMap, firstValueFrom, pairwise } from "rxjs";
 
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
@@ -298,7 +298,9 @@ export class WindowMain {
         backgroundThrottling: false,
         contextIsolation: true,
         session: this.session,
-        devTools: true,
+        // AZCO: DevTools (and Ctrl+Shift+I / F12 shortcuts) enabled only on
+        // dev machines (HKCU/HKLM `AZCO\Vault\DevMode = 1` or env AZCO_VAULT_DEV=1).
+        devTools: isAzcoDevMachine(),
       },
     });
 
@@ -360,8 +362,21 @@ export class WindowMain {
       );
     }
 
-    // Open the DevTools. (AZCO: always-on for dev fork)
-    this.win.webContents.openDevTools({ mode: "detach" });
+    // AZCO: never auto-open DevTools. On dev machines only, right-click
+    // shows a context menu with "Open DevTools" (gated via webPreferences.devTools).
+    if (isAzcoDevMachine()) {
+      this.win.webContents.on("context-menu", (_event, params) => {
+        const menu = Menu.buildFromTemplate([
+          {
+            label: "Open DevTools",
+            click: () => this.win.webContents.openDevTools({ mode: "detach" }),
+          },
+          { type: "separator" },
+          { label: "Reload", role: "reload" },
+        ]);
+        menu.popup({ window: this.win, x: params.x, y: params.y });
+      });
+    }
 
     // Emitted when the window is closed.
     this.win.on("closed", async () => {
@@ -562,4 +577,44 @@ export class WindowMain {
       state.height > 0
     );
   }
+}
+
+// AZCO: detect whether this install should auto-open DevTools on launch.
+// Checks env var first, then Windows registry (HKCU then HKLM).
+function isAzcoDevMachine(): boolean {
+  if (process.env.AZCO_VAULT_DEV === "1") {
+    return true;
+  }
+  if (process.platform !== "win32") {
+    return false;
+  }
+  try {
+    // Lazy require so non-Windows platforms don't pull electron here.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { app } = require("electron");
+    // Node's registry access — use a simple child_process reg query. Avoids
+    // pulling a 3rd-party dep for a one-line check.
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { execFileSync } = require("child_process");
+    for (const hive of ["HKCU", "HKLM"]) {
+      try {
+        const out = execFileSync(
+          "reg.exe",
+          ["query", `${hive}\\Software\\AZCO\\Vault`, "/v", "DevMode"],
+          { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },
+        );
+        // Output contains "    DevMode    REG_DWORD    0x1"
+        if (/DevMode\s+REG_DWORD\s+0x1\b/i.test(out)) {
+          return true;
+        }
+      } catch {
+        // key missing — try next hive
+      }
+    }
+    // Keep `app` referenced so lazy-require isn't tree-shaken.
+    void app;
+  } catch {
+    // Fail closed — if detection fails, don't auto-open.
+  }
+  return false;
 }

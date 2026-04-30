@@ -26,7 +26,7 @@
   "generateUpdatesFilesForAllChannels": true,
   "publish": {
     "provider": "generic",
-    "url": "http://vault-updates.azco.local"
+    "url": "https://api.azco.local/api/updates/vault/"
   },
   "mac": {
     "electronUpdaterCompatibility": ">=0.0.1",
@@ -162,9 +162,9 @@
   },
   "nsis": {
     "oneClick": true,
-    "perMachine": true,
+    "perMachine": false,
     "allowToChangeInstallationDirectory": false,
-    "artifactName": "${productName}-Setup-${version}.${ext}",
+    "artifactName": "${productName} Setup ${version}.${ext}",
     "uninstallDisplayName": "${productName}",
     "deleteAppDataOnUninstall": false,
     "shortcutName": "AZCO Vault",

@@ -11,8 +11,9 @@ container on `azco26` and is fronted by the Cloudflare tunnel
   (`public/styles.css`), one ES module (`public/app.js`), one SVG
   logo (`public/logo-blue.svg`).
 - An `nginx.conf` that serves those assets and reverse-proxies
-  exactly one endpoint — `POST /api/sends/access/{id}` — to the real
-  Vaultwarden at `vw.securusconverting.com`. Everything else returns 404.
+  exactly one endpoint — `POST /api/sends/access/{id}` — to the
+  upstream Vaultwarden container over Docker's internal network
+  (never crosses the public internet). Everything else returns 404.
 - No application code, no database, no state, no session. The
   decryption key lives in the URL fragment (`#/<accessId>/<urlB64Key>`)
   and never leaves the recipient's browser.
@@ -20,15 +21,37 @@ container on `azco26` and is fronted by the Cloudflare tunnel
 ## Architecture
 
 ```
-recipient browser ── HTTPS ──▶ Cloudflare tunnel ──▶ 127.0.0.1:8329 on azco26
+recipient browser ── HTTPS ──▶ Cloudflare tunnel ──▶ azco-share-viewer container
+                                                      │   (listens on 127.0.0.1:8329)
                                                       │
-                                                      │  serves /, /index.html,
-                                                      │  /app.js, /styles.css,
-                                                      │  /logo-blue.svg, /healthz
+                                                      │   serves /, /index.html,
+                                                      │   /app.js, /styles.css,
+                                                      │   /logo-blue.svg, /healthz
                                                       │
-                                                      └── proxy_pass ──▶ vw.securusconverting.com
+                                                      └── proxy_pass ──▶ vaultwarden container
                                                           POST /api/sends/access/{id}
+                                                          via shared Docker network
+                                                          (never leaves the host)
 ```
+
+### Why container-to-container
+
+The Send-access proxy targets the Vaultwarden container directly over
+Docker's internal network instead of round-tripping through the public
+Cloudflare-fronted Vaultwarden hostname. Three reasons:
+
+- **Latency.** The hop is `share-viewer → vaultwarden:80` on the same
+  Docker host instead of `share-viewer → CF edge → CF tunnel → host
+nginx → vaultwarden`. Roughly 5× faster, and removes CF as a runtime
+  dependency for share fetches.
+- **Isolation.** The public Vaultwarden hostname can sit behind any
+  auth layer (rate-limits, allow-lists, IdP gating, etc.). The share
+  viewer's required endpoint — `POST /api/sends/access/*` — is
+  intentionally anonymous; coupling it to a hostname that may later
+  gain auth would silently break shares. Going direct guarantees the
+  two policies stay independent.
+- **Surface area.** Each share request used to leave the host and
+  re-enter through the public edge. Now it stays inside Docker.
 
 The browser POSTs the encrypted Send to the proxy, gets the EncString
 payload back, runs HKDF-SHA256(key, salt="bitwarden-send", info="send")
@@ -54,6 +77,7 @@ docker rm -f azco-share-viewer 2>/dev/null
 docker run -d \
   --name azco-share-viewer \
   --restart unless-stopped \
+  --network <vaultwarden-docker-network> \
   -p 127.0.0.1:8329:8080 \
   azco-share-viewer:latest
 
@@ -64,6 +88,14 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
   -d '{"password":null}' \
   http://127.0.0.1:8329/api/sends/access/deadbeef  # → 404 from Vaultwarden
 ```
+
+The `--network` value must match the Docker network your Vaultwarden
+container is attached to (e.g. `vaultwarden_default` if VW was started
+via `docker compose` from a directory named `vaultwarden/`). The
+`nginx.conf` resolves the upstream as `http://vaultwarden:80` via
+Docker's container-name DNS, so the Vaultwarden container must be
+named `vaultwarden` on that network — or you can change the
+`proxy_pass` target in `nginx.conf` to match your container name.
 
 ### Updating the live container
 
@@ -76,6 +108,7 @@ cd azco-share-viewer
 docker build -t azco-share-viewer:latest .
 docker rm -f azco-share-viewer
 docker run -d --name azco-share-viewer --restart unless-stopped \
+  --network <vaultwarden-docker-network> \
   -p 127.0.0.1:8329:8080 azco-share-viewer:latest
 ```
 
@@ -114,20 +147,25 @@ so HTML changes propagate on the next page load.
 - HTTP method allow-list on the proxy (POST / OPTIONS only)
 - Rate limit: 10 req/min per client IP on `/api/sends/access/*`,
   burst 20 (zone `send_access`, 10 MB of state)
-- `proxy_ssl_verify on` against the container's CA bundle
+- Upstream proxy stays inside Docker's internal network — the
+  Vaultwarden hostname is never resolved publicly and the request
+  is never observable on the wire outside the host
 - Cookies from Vaultwarden hidden from recipient responses
 - Listens only on `127.0.0.1:8329` — the Cloudflare tunnel is the
   only way to reach it
 
 ### Known gaps
 
-- Vaultwarden itself is still reachable at `vw.securusconverting.com`
-  through the CF tunnel. Once v2 is stable, firewall VW to accept
-  traffic only from the viewer egress + internal LAN.
 - No logging redaction on client IPs. nginx's access log retains
   whatever logrotate is configured to keep.
 - No fail2ban — a sustained 404 sprayer will eventually get
   throttled by the rate limit but not permanently blocked.
+- The proxy depends on Docker's container-name DNS for
+  `vaultwarden:80`. If the upstream container is recreated and
+  comes back with a different IP, the share viewer's resolver
+  cache (60s TTL) re-resolves automatically; no restart needed.
+  If the network or container name changes, the share viewer
+  must be reconfigured.
 
 ## Error handling reference
 
