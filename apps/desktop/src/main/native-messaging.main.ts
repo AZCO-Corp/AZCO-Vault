@@ -367,6 +367,8 @@ export class NativeMessagingMain {
       "chrome-extension://jbkfoedolllekgbhcbcoahefnbanhhlh/",
       // Opera extension
       "chrome-extension://ccnckbpmaceehanjmeomladnmlffdjgn/",
+      // AZCO self-hosted Edge fork (CRX key at C:\AZCO\codesign\azco-vault-ext.pem)
+      "chrome-extension://eclanhnfdffhdcaanccbmhimechcbhce/",
     ]);
 
     if (!isDev()) {

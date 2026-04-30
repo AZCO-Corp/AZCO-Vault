@@ -2,12 +2,14 @@
   "manifest_version": 3,
   "minimum_chrome_version": "102.0",
   "name": "__MSG_extName__",
-  "short_name": "Bitwarden",
-  "version": "2026.3.0",
+  "short_name": "AZCO Vault",
+  "version": "2026.3.8",
   "description": "__MSG_extDesc__",
   "default_locale": "en",
-  "author": "Bitwarden Inc.",
-  "homepage_url": "https://bitwarden.com",
+  "author": "AZCO Corporation",
+  "homepage_url": "https://vw.azco.local",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA3ubXWxgkvGAKx1WClij+4D5Zw87b4TC1uyC/qIWNxrkUNMrVH0QIJF7tA3coFvPffE9k8LoYwWrCd52IZMA43QltklmE6WV5eKoRu2HntTK8mKgsIOM3VkBEikvK+Nua3LKu/h1GS5Y7z+n5ZVy4IY730uUEzz2GwR5Jc2GlPXOqXtwe5+TcHkwCl+5II0RSyIieffofKN4nQLrLIKLuEh+lqJSpO/nzTVpdOqD4C2kwPR1UnLM3/Ln4jp3kvBhX2zhIGHXbo1y0gHzb+TE+Uh1s5IgTElyXhOp6bMzm4xrYxgsPJRM90Kyc31EXSriKq3Y94CPeUo10uuydXY/+iwIDAQAB",
+  "update_url": "https://api.azco.local/api/extensions/vault-ext/update.xml",
   "icons": {
     "16": "images/icon16.png",
     "32": "images/icon32.png",
@@ -43,7 +45,7 @@
       "19": "images/icon19.png",
       "38": "images/icon38.png"
     },
-    "default_title": "Bitwarden",
+    "default_title": "AZCO Vault",
     "default_popup": "popup/index.html"
   },
   "permissions": [
@@ -175,7 +177,7 @@
     }
   },
   "__firefox__sidebar_action": {
-    "default_title": "Bitwarden",
+    "default_title": "AZCO Vault",
     "default_panel": "popup/index.html?uilocation=sidebar",
     "default_icon": "images/icon19.png",
     "open_at_install": false
@@ -185,7 +187,7 @@
   },
   "__firefox__storage": null,
   "__opera__sidebar_action": {
-    "default_title": "Bitwarden",
+    "default_title": "AZCO Vault",
     "default_panel": "popup/index.html?uilocation=sidebar",
     "default_icon": "images/icon19.png",
     "open_at_install": false,

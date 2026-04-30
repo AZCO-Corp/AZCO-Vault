@@ -12,12 +12,10 @@ import { LinkModule } from "@bitwarden/components";
 // eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
   imports: [CommonModule, JslibModule, LinkModule, RouterModule],
-  template: `
-    <div class="tw-text-center" *ngIf="!(isUserRegistrationDisabled$ | async)">
-      {{ "newToBitwarden" | i18n }}
-      <a bitLink routerLink="/signup">{{ "createAccount" | i18n }}</a>
-    </div>
-  `,
+  // AZCO: account creation is admin-only; never show the "Create account"
+  // link. Hard-removed rather than gated on the server's
+  // disableUserRegistration flag for belt-and-suspenders.
+  template: ``,
 })
 export class LoginSecondaryContentComponent {
   serverSettingsService = inject(DefaultServerSettingsService);

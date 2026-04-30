@@ -78,43 +78,37 @@ export const USER_CLOUD_REGION_KEY = new UserKeyDefinition<CloudRegion>(
 );
 
 /**
- * The production regions available for selection.
+ * AZCO: only one region exists -- our self-hosted Vaultwarden at
+ * vw.azco.local. Region.US is reused as the key (rather than introducing
+ * a new enum value) because Region.US is what gets baked in as
+ * DEFAULT_REGION downstream and is special-cased in many parts of the
+ * codebase. Just rewriting its URLs and domain string is the minimal
+ * patch that yanks bitwarden.com out of every dropdown, every fallback,
+ * and every fresh-install code path.
  *
- * In the future we desire to load these urls from the config endpoint.
+ * base is set; api/identity/icons/etc. are derived from base + path
+ * by Bitwarden's UrlEnvironment logic, so we don't need to spell them
+ * out.
  */
 export const PRODUCTION_REGIONS: RegionConfig[] = [
   {
     key: Region.US,
-    domain: "bitwarden.com",
+    domain: "vw.azco.local",
     urls: {
-      base: null,
-      api: "https://api.bitwarden.com",
-      identity: "https://identity.bitwarden.com",
-      icons: "https://icons.bitwarden.net",
-      webVault: "https://vault.bitwarden.com",
-      notifications: "https://notifications.bitwarden.com",
-      events: "https://events.bitwarden.com",
-      scim: "https://scim.bitwarden.com",
-    },
-  },
-  {
-    key: Region.EU,
-    domain: "bitwarden.eu",
-    urls: {
-      base: null,
-      api: "https://api.bitwarden.eu",
-      identity: "https://identity.bitwarden.eu",
-      icons: "https://icons.bitwarden.eu",
-      webVault: "https://vault.bitwarden.eu",
-      notifications: "https://notifications.bitwarden.eu",
-      events: "https://events.bitwarden.eu",
-      scim: "https://scim.bitwarden.eu",
+      base: "https://vw.azco.local",
+      api: null,
+      identity: null,
+      icons: null,
+      webVault: null,
+      notifications: null,
+      events: null,
+      scim: null,
     },
   },
 ];
 
 /**
- * The default region when starting the app.
+ * The default region when starting the app. AZCO has only one.
  */
 const DEFAULT_REGION = Region.US;
 
