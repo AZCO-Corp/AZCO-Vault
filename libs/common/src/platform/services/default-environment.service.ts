@@ -217,6 +217,13 @@ export class DefaultEnvironmentService implements EnvironmentService {
       region = DEFAULT_REGION;
     }
 
+    // AZCO: any non-AZCO self-hosted URL is stale leftover state (e.g.
+    // localhost:8080 from an earlier Bitwarden install or our previous
+    // env-selector). Discard and fall through to PRODUCTION_REGIONS[0].
+    if (region == Region.SelfHosted && !urls?.base?.includes("vw.azco.local")) {
+      region = DEFAULT_REGION;
+    }
+
     if (region != Region.SelfHosted) {
       await this.globalState.update(() => ({
         region: region,
@@ -266,6 +273,12 @@ export class DefaultEnvironmentService implements EnvironmentService {
     // If self-hosted ensure urls are valid else fallback to default region
     if (region == Region.SelfHosted && isEmpty(urls)) {
       region = DEFAULT_REGION;
+    }
+
+    // AZCO: same self-heal as setEnvironment (see comment there).
+    if (region == Region.SelfHosted && !urls?.base?.includes("vw.azco.local")) {
+      region = DEFAULT_REGION;
+      urls = null;
     }
 
     // Load urls from region config
