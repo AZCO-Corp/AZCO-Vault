@@ -38,17 +38,50 @@ async function azcoStaleEnvCleanup(): Promise<void> {
 // is to download a new CRX when update.xml advertises a higher version,
 // then *wait for the extension to become idle* before swapping. Bitwarden
 // is rarely idle (alarms, vault sync, autofill content scripts) so the
-// new version stages indefinitely -- e.g. 2026.3.13 active, 2026.3.14
-// downloaded, neither dir removed. Force immediate apply via
-// chrome.runtime.reload() the moment Chrome stages an update.
+// new version stages indefinitely.
+//
+// We force immediate apply via chrome.runtime.reload(), but only when
+// the popup is NOT open -- otherwise the popup vanishes mid-interaction
+// and the user's typing is lost. If a popup is open when the update
+// stages, defer the reload, poll every few seconds (via chrome.alarms,
+// which keeps the SW alive even when otherwise idle), and reload as
+// soon as the popup closes. The user just sees the new version on next
+// click of the icon.
 //
 // (Tried chrome.runtime.requestUpdateCheck() to force a poll on popup
-// open. It is silently a no-op for policy-installed self-hosted
-// extensions despite the docs not flagging this -- Edge's nginx access
-// log shows zero polls after the call. Removed.)
+// open. Silent no-op for policy-installed self-hosted extensions even
+// though the docs don't flag it. Removed.)
+const PENDING_RELOAD_ALARM = "azco-pending-reload";
+let pendingUpdateVersion: string | null = null;
+
+async function tryApplyPendingReload(): Promise<void> {
+  if (!pendingUpdateVersion) {
+    return;
+  }
+  const popups = await chrome.runtime.getContexts({
+    contextTypes: ["POPUP" as chrome.runtime.ContextType],
+  });
+  if (popups.length === 0) {
+    logService.info(`AZCO: applying staged update ${pendingUpdateVersion}`);
+    chrome.runtime.reload();
+  } else {
+    // Popup is open; check again shortly. delayInMinutes minimum is
+    // technically 0.5 in stable Chrome but Edge accepts smaller values
+    // -- if it doesn't, the alarm just fires at 30s instead.
+    void chrome.alarms.create(PENDING_RELOAD_ALARM, { delayInMinutes: 0.05 });
+  }
+}
+
 chrome.runtime.onUpdateAvailable.addListener((details) => {
-  logService.info(`AZCO: applying staged update ${details?.version}`);
-  chrome.runtime.reload();
+  pendingUpdateVersion = details?.version ?? "unknown";
+  logService.info(`AZCO: update ${pendingUpdateVersion} staged, scheduling apply`);
+  void tryApplyPendingReload();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === PENDING_RELOAD_ALARM) {
+    void tryApplyPendingReload();
+  }
 });
 
 void (async () => {
