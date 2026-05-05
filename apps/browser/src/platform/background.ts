@@ -46,13 +46,14 @@ chrome.runtime.onUpdateAvailable.addListener((details) => {
   chrome.runtime.reload();
 });
 
-// Also actively poll on every popup open. onConnect fires for every port
-// the popup or any other extension page opens to the SW; we debounce so
-// we only check at most once a minute regardless of how many ports come
-// in. requestUpdateCheck has a built-in throttle on Chrome's side too,
-// so this is safe to call frequently.
+// Also actively poll whenever the popup wakes the SW. Bitwarden's popup
+// communicates via chrome.runtime.sendMessage (one-shot), not connect()
+// ports, so we hook onMessage instead. Any incoming message triggers a
+// debounced update check -- Chrome's own throttle (~5min minimum between
+// requestUpdateCheck calls) is the floor; our 60s gate avoids redundant
+// API calls when many messages arrive in quick succession.
 let lastUpdateCheck = 0;
-chrome.runtime.onConnect.addListener(() => {
+chrome.runtime.onMessage.addListener(() => {
   const now = Date.now();
   if (now - lastUpdateCheck < 60_000) {
     return;
