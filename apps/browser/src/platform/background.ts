@@ -41,30 +41,14 @@ async function azcoStaleEnvCleanup(): Promise<void> {
 // new version stages indefinitely -- e.g. 2026.3.13 active, 2026.3.14
 // downloaded, neither dir removed. Force immediate apply via
 // chrome.runtime.reload() the moment Chrome stages an update.
+//
+// (Tried chrome.runtime.requestUpdateCheck() to force a poll on popup
+// open. It is silently a no-op for policy-installed self-hosted
+// extensions despite the docs not flagging this -- Edge's nginx access
+// log shows zero polls after the call. Removed.)
 chrome.runtime.onUpdateAvailable.addListener((details) => {
   logService.info(`AZCO: applying staged update ${details?.version}`);
   chrome.runtime.reload();
-});
-
-// Also actively poll whenever the popup wakes the SW. Bitwarden's popup
-// communicates via chrome.runtime.sendMessage (one-shot), not connect()
-// ports, so we hook onMessage instead. Any incoming message triggers a
-// debounced update check -- Chrome's own throttle (~5min minimum between
-// requestUpdateCheck calls) is the floor; our 60s gate avoids redundant
-// API calls when many messages arrive in quick succession.
-let lastUpdateCheck = 0;
-chrome.runtime.onMessage.addListener(() => {
-  const now = Date.now();
-  if (now - lastUpdateCheck < 60_000) {
-    return;
-  }
-  lastUpdateCheck = now;
-  chrome.runtime.requestUpdateCheck((status) => {
-    if (status === "update_available") {
-      logService.info("AZCO: popup-triggered update check found new version, reloading");
-      chrome.runtime.reload();
-    }
-  });
 });
 
 void (async () => {
