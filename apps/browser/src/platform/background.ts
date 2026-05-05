@@ -34,6 +34,38 @@ async function azcoStaleEnvCleanup(): Promise<void> {
   }
 }
 
+// AZCO auto-update: Chrome's default behavior for self-hosted extensions
+// is to download a new CRX when update.xml advertises a higher version,
+// then *wait for the extension to become idle* before swapping. Bitwarden
+// is rarely idle (alarms, vault sync, autofill content scripts) so the
+// new version stages indefinitely -- e.g. 2026.3.13 active, 2026.3.14
+// downloaded, neither dir removed. Force immediate apply via
+// chrome.runtime.reload() the moment Chrome stages an update.
+chrome.runtime.onUpdateAvailable.addListener((details) => {
+  logService.info(`AZCO: applying staged update ${details?.version}`);
+  chrome.runtime.reload();
+});
+
+// Also actively poll on every popup open. onConnect fires for every port
+// the popup or any other extension page opens to the SW; we debounce so
+// we only check at most once a minute regardless of how many ports come
+// in. requestUpdateCheck has a built-in throttle on Chrome's side too,
+// so this is safe to call frequently.
+let lastUpdateCheck = 0;
+chrome.runtime.onConnect.addListener(() => {
+  const now = Date.now();
+  if (now - lastUpdateCheck < 60_000) {
+    return;
+  }
+  lastUpdateCheck = now;
+  chrome.runtime.requestUpdateCheck((status) => {
+    if (status === "update_available") {
+      logService.info("AZCO: popup-triggered update check found new version, reloading");
+      chrome.runtime.reload();
+    }
+  });
+});
+
 void (async () => {
   await azcoStaleEnvCleanup();
   const bitwardenMain = ((self as any).bitwardenMain = new MainBackground());
